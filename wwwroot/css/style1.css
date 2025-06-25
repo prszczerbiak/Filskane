@@ -82,6 +82,11 @@ html, body {
 
     transition: transform 0.3s ease; /* płynne przejście przy hoverze */
 }
+.tile-grid a {
+  text-decoration: none; /* usuwa podkreślenie */
+  color: inherit;         /* dziedziczy kolor z rodzica (div.tile) */
+}
+
 
 /* Obrazy kafelków */
 .tile1 {

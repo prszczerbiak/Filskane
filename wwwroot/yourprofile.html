@@ -4,25 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Twój Profil</title>
-    <link rel="stylesheet" href="css/style1.css">
+    <link rel="stylesheet" href="css/yourprofilestyle.css">
 </head>
 <body>
     <div class="content">
-        <!--<nav class="menu">
-            <a href="#">Strona główna</a>
-            <a href="#">O nas</a>
-            <a href="#">Usługi</a>
-            <a href="#">Kontakt</a>
-        </nav>
-            -->
+        <div class="menu">
+            <a href="#">
+                <div class="menu-option active">Twoje dane</div>
+            </a>
+            <a href="#">
+                <div class="menu-option">Ustawienia</div>
+            </a>
+            <a href="#">
+                <div class="menu-option">Opcja 1</div>
+            </a>
+        </div>
 
-        <h2>Witaj, panie zalogowany 😊</h2>
-
-        <div class="tile-grid">
-            <div class="tile tile1">Twoje gospodarstwo</div>
-            <div class="tile tile2">Skanuj pole</div>
-            <div class="tile tile3">Aktualności</div>
-            <div class="tile tile4">Twój profil</div>
+        <div class="description">
+            <h2>Witamy!</h2>
+            <p>Tutaj pojawi się zawartość zależna od wybranej opcji.</p>
         </div>
 
     </div>
@@ -30,5 +30,7 @@
     <footer>
         <p>&copy; 2024 Moja Strona. Wszelkie prawa zastrzeżone.</p>
     </footer>
+
+    <script src="js/menu.js" defer></script>
 </body>
 </html>

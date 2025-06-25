@@ -19,20 +19,58 @@ html, body {
     background-color: white; /* Opcjonalne tło */
     border-radius: 15px; /* Zaokrąglone rogi ramki */
     margin: 20px 50px 20px 50px;
-    display: flex; /* Ustawiamy Flexbox na elemencie .content */
-    justify-content: center; /* Wyśrodkowanie poziome */
-    align-items: center; /* Wyśrodkowanie pionowe */
-    flex-direction: column; /* Umożliwia ewentualne dodanie nagłówka nad kafelkami */
+    display: grid; /* ✅ Grid zamiast Flex */
+    grid-template-columns: 1fr 2fr; /* 🧩 1/3 i 2/3 szerokości */
+    gap: 20px;
 }
 
+.menu {
+    background-color: #ffffff;
+    border-right: 1px solid #ddd;
+    padding: 20px;
+}
+.menu a {
+    display: block;
+    margin-bottom: 15px;
+    text-decoration: none;
+    color: #333;
+    font-weight: bold;
+}
 
+.menu-option {
+    border: 5px solid green;
+    margin-bottom: 15px;
+    padding: 20px 20px;
+    background-color: #f8f8f8;
+    color: black;
+    border-radius: 25px;
+    font-weight: bold;
+    text-align: center;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.2s;
+}
+
+.menu-option:hover {
+    background-color: green;
+    color: white;
+    transform: scale(1.05);
+}
+
+.menu-option.active {
+    background-color: green; /* wygląd jak po hover */
+    color: white;
+    transform: scale(1.05);
+}
+
+.description {
+    padding: 20px;
+}
 
 footer {
     background-color: green; /* Zielone tło */
     color: white; /* Biały tekst */
     text-align: center; /* Wyśrodkowanie tekstu */
     padding: 15px; /* Wewnętrzny odstęp */
-    /*position: fixed; /* Przyklejenie stopki do dołu */
     bottom: 0;
     left: 0; /* Przypięcie do lewej strony */
     width: 100%; /* Pełna szerokość ekranu */
