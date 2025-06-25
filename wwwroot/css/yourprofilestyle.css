@@ -1,0 +1,40 @@
+﻿body {
+    font-family: Arial, sans-serif;
+    background-color: #f8f8f8;
+    text-align: center;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%; /* Upewnij się, że body i html mają wysokość 100% */
+}
+
+.content {
+    border: 5px solid green; /* Zielona ramka */
+    width: calc(100% - 100px); /* Pełna szerokość strony */
+    min-height: calc(100vh - 120px); /* Wypełnia całą wysokość ekranu minus stopka */
+    padding: 20px; /* Odstęp od krawędzi ramki */
+    box-sizing: border-box; /* Zapobiega rozpychaniu ramki przez padding */
+    background-color: white; /* Opcjonalne tło */
+    border-radius: 15px; /* Zaokrąglone rogi ramki */
+    margin: 20px 50px 20px 50px;
+    display: flex; /* Ustawiamy Flexbox na elemencie .content */
+    justify-content: center; /* Wyśrodkowanie poziome */
+    align-items: center; /* Wyśrodkowanie pionowe */
+    flex-direction: column; /* Umożliwia ewentualne dodanie nagłówka nad kafelkami */
+}
+
+
+
+footer {
+    background-color: green; /* Zielone tło */
+    color: white; /* Biały tekst */
+    text-align: center; /* Wyśrodkowanie tekstu */
+    padding: 15px; /* Wewnętrzny odstęp */
+    /*position: fixed; /* Przyklejenie stopki do dołu */
+    bottom: 0;
+    left: 0; /* Przypięcie do lewej strony */
+    width: 100%; /* Pełna szerokość ekranu */
+    box-sizing: border-box; /* Zapobiega przesunięciom przez padding */
+}
