@@ -66,6 +66,53 @@ html, body {
     padding: 20px;
 }
 
+.description form {
+    text-align: left;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.description label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    text-align: left; /* Dodatkowo: wyrównanie etykiet */
+}
+
+.description input {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    margin-bottom: 15px;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+.input-with-icon {
+    display: flex;
+    align-items: center; /* Wyśrodkowanie w pionie */
+    gap: 8px; /* odstęp między polem a ikoną */
+}
+
+.input-with-icon input {
+    flex: 1;
+    padding-right: 10px; /* opcjonalnie, więcej miejsca z prawej */
+    height: 36px; /* dopasuj do ikonki, jeśli trzeba */
+    font-size: 16px;
+    line-height: 1.2;
+}
+
+.edit-icon {
+    cursor: pointer;
+    font-size: 18px;
+    color: #007BFF;
+    user-select: none;
+    display: flex;
+    align-items: center; /* wyśrodkowanie w pionie */
+    height: 100%;
+}
+
 footer {
     background-color: green; /* Zielone tło */
     color: white; /* Biały tekst */
