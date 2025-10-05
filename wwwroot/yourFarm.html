@@ -1,0 +1,103 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twoje gospodarstwo</title>
+    <link rel="stylesheet" href="css/yourFarmStyle.css">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+
+
+</head>
+<body>
+    <div class="content">
+        <h2>Mapa twojego gospodarstwa</h2>
+
+        <div id="map"></div>
+    </div>
+
+    <div id="noFarmModal" class="modal">
+        <div class="modalContent">
+            <p>
+                Nie masz jeszcze gospodarstwa.
+            </p>
+            <div class="modalActions">
+                <button id="exitBtn" class="btn-cancel">Wyjdź</button>
+                <button id="createFarmBtn" class="btn-primary">Stwórz</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="setFarmModal" class="modal">
+        <div class="transparentModalContent">
+            <h3>Znajdź położenie swojego gospodarstwa:</h3>
+            <div id="selectMap"></div>
+            <button id="cancelSetFarmBtn" class="btn-danger">Anuluj</button>
+            <button id="confirmSetFarmBtn" class="btn-success">Zatwierdź</button>
+        </div>
+    </div>
+
+    <div id="drawFieldModal" class="modal">
+        <div class="transparentModalContent">
+            <h3>Znajdź położenie swojego pola:</h3>
+            <div id="addFieldMap"></div>
+            <button id="cancelAddFieldBtn" class="btn-danger">Anuluj</button>
+            <button id="addFieldBtn" class="btn-success">Zatwierdź</button>
+        </div>
+    </div>
+
+    <div id="nameFieldModal" class="modal">
+        <div class="transparentModalContent">
+            <h3>Wpisz nazwę dla swojego pola:</h3>
+            <div>
+                <input type="text" id="fieldNameInput" placeholder="Np. Pole 1" />
+            </div>
+            <button id="cancelNamedFieldBtn" class="btn-danger">Anuluj</button>
+            <button id="namedFieldBtn" class="btn-success">Zatwierdź</button>
+        </div>
+    </div>
+
+    <div id="deleteFarmModal" class="modal">
+        <div class="modalContent">
+            <p>
+                Zostaną utracone dane ze wszystkich pól.<br>
+                Czy na pewno chcesz usunąć gospodarstwo?
+            </p>
+            <div class="modalActions">
+                <button id="cancelDeleteBtn" class="btn-cancel">Anuluj</button>
+                <button id="confirmDeleteBtn" class="btn-danger">Usuń</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="deleteFieldModal" class="modal">
+        <div class="modalContent">
+            <p>
+                Czy na pewno chcesz usunąć to pole?<br>
+                Wszystkie skojarzone z nim dane zostaną usunięte bezpowrotnie!
+            </p>
+            <div class="modalActions">
+                <button id="cancelDeleteFieldBtn" class="btn-cancel">Anuluj</button>
+                <button id="confirmDeleteFieldBtn" class="btn-danger">Usuń</button>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2024 Moja Strona. Wszelkie prawa zastrzeżone.</p>
+    </footer>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
+
+    <script src="js/yourFarm.js"></script>
+
+</body>
+</html>

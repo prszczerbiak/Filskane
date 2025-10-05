@@ -1,0 +1,189 @@
+﻿body {
+    font-family: Arial, sans-serif;
+    background-color: #f8f8f8;
+    text-align: center;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%; /* Upewnij się, że body i html mają wysokość 100% */
+}
+
+.content {
+    border: 5px solid green;
+    width: calc(100% - 100px);
+    min-height: calc(100vh - 120px);
+    padding: 20px;
+    box-sizing: border-box;
+    background-color: white;
+    border-radius: 15px;
+    margin: 20px 50px;
+    display: flex;
+    flex-direction: column; /* nagłówek na górze, kafelki pod spodem */
+    /* usuwamy align-items i justify-content! */
+}
+
+
+footer {
+    background-color: green; /* Zielone tło */
+    color: white; /* Biały tekst */
+    text-align: center; /* Wyśrodkowanie tekstu */
+    padding: 15px; /* Wewnętrzny odstęp */
+    /*position: fixed; /* Przyklejenie stopki do dołu */
+    bottom: 0;
+    left: 0; /* Przypięcie do lewej strony */
+    width: 100%; /* Pełna szerokość ekranu */
+    box-sizing: border-box; /* Zapobiega przesunięciom przez padding */
+}
+
+.fieldContent {
+    display: flex;
+    justify-content: space-between; /* odstęp między kolumnami */
+    gap: 100px; /* opcjonalna przerwa */
+    margin-top: 20px;
+    width: 100%;
+    flex: 1; /* <-- wypełni całą dostępną wysokość */
+    align-items: stretch; /* <-- kolumny rozciągną się na całość */
+}
+
+.field {
+    flex: 1; /* obie zajmą po 50% */
+    padding: 10px;
+}
+
+.fieldScan{
+    flex: 1; /* obie zajmą po 50% */
+    padding: 10px;
+}
+
+.actions {
+    display: flex;
+    gap: 10px; /* odstęp między guzikami */
+    margin: 20px 0;
+    justify-content: center;
+}
+
+    .actions button {
+        background-color: #007BFF; /* niebieski */
+        color: white; /* biały napis */
+        border: none; /* bez obramowania */
+        padding: 10px 20px; /* wewnętrzne marginesy */
+        border-radius: 6px; /* zaokrąglone rogi */
+        font-size: 16px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+        .actions button:hover {
+            background-color: #0056b3; /* ciemniejszy niebieski po najechaniu */
+        }
+
+.fieldInfo {
+    text-align: left;
+}
+
+table {
+    border-collapse: collapse;
+}
+
+td {
+    padding: 5px 30px; /* odstęp między kolumnami i wierszami */
+    vertical-align: top;
+}
+
+h4 {
+    font-weight: bold;
+    margin-top: 1em;
+    margin-bottom: 1em;
+}
+
+.fa-regular.fa-pen-to-square {
+    margin-top: 1em;
+    margin-bottom: 1em;
+}
+
+.modal {
+    display: none; /* domyślnie ukryty */
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: #fff;
+    margin: 10% auto;
+    padding: 20px;
+    border-radius: 10px;
+    width: 400px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.close {
+    float: right;
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #444;
+}
+
+    .close:hover {
+        color: red;
+    }
+
+form label {
+    display: block;
+    margin: 10px 0 5px;
+}
+
+form input, form select {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 15px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.modal-footer {
+    text-align: center;
+}
+
+    .modal-footer button {
+        padding: 8px 15px;
+        margin-left: 10px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+.btn-cancel {
+    background: #ccc;
+}
+
+.btn-save {
+    background: #28a745;
+    color: #fff;
+}
+
+.colConst{
+    width: 250px;
+}
+

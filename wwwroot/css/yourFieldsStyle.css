@@ -1,0 +1,130 @@
+﻿body {
+    font-family: Arial, sans-serif;
+    background-color: #f8f8f8;
+    text-align: center;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%; /* Upewnij się, że body i html mają wysokość 100% */
+}
+
+.content {
+    border: 5px solid green;
+    width: calc(100% - 100px);
+    min-height: calc(100vh - 120px);
+    padding: 20px;
+    box-sizing: border-box;
+    background-color: white;
+    border-radius: 15px;
+    margin: 20px 50px;
+    display: flex;
+    flex-direction: column; /* nagłówek na górze, kafelki pod spodem */
+    /* usuwamy align-items i justify-content! */
+    align-items: center;
+}
+
+
+footer {
+    background-color: green; /* Zielone tło */
+    color: white; /* Biały tekst */
+    text-align: center; /* Wyśrodkowanie tekstu */
+    padding: 15px; /* Wewnętrzny odstęp */
+    /*position: fixed; /* Przyklejenie stopki do dołu */
+    bottom: 0;
+    left: 0; /* Przypięcie do lewej strony */
+    width: 100%; /* Pełna szerokość ekranu */
+    box-sizing: border-box; /* Zapobiega przesunięciom przez padding */
+}
+
+.title {
+    font-size: 24px;
+    margin-bottom: 20px;
+    text-align: center;
+    flex: 0 0 auto;
+}
+
+#fields-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: flex-start;
+    gap: 15px;
+    align-items: flex-start;
+    padding: 40px 0;
+    position: relative;
+}
+
+    #fields-container::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 2px; /* grubość linii */
+        background: linear-gradient(to right, rgba(0,123,255,0), /* przezroczysta na początku */
+        rgba(0,123,255,1), /* pełny kolor po środku */
+        rgba(0,123,255,0)); /* przezroczysta na końcu */
+    }
+
+
+/* 1 kafelek */
+/*@media (max-width: 190px) {
+    #fields-container {
+        width: 190px;
+    }
+}*/
+
+/* 2 kafelki */
+/*@media (min-width: 191px) and (max-width: 395px) {
+    #fields-container {
+        width: calc(2 * 190px + 1 * 15px);*/ /* 395px */
+    /*}
+}*/
+
+/* 3 kafelki */
+/*@media (min-width: 396px) and (max-width: 590px) {
+    #fields-container {
+        width: calc(3 * 190px + 2 * 15px);*/ /* 590px */
+    /*}
+}*/
+
+/* 4 kafelki */
+/*@media (min-width: 591px) and (max-width: 785px) {
+    #fields-container {
+        width: calc(4 * 190px + 3 * 15px);*/ /* 785px */
+    /*}
+}*/
+
+/* 5 kafelków */
+/*@media (min-width: 786px) and (max-width: 980px) {
+    #fields-container {
+        width: calc(5 * 190px + 4 * 15px);*/ /* 980px */
+    /*}
+}*/
+
+/* 6 kafelków (max) */
+/*@media (min-width: 981px) {
+    #fields-container {
+        width: calc(6 * 190px + 5 * 15px);*/ /* 1175px */
+        /*max-width: 100%;
+    }
+}*/
+
+.field-tile {
+    flex: 0 0 150px;
+    height: 120px;
+    background: linear-gradient(135deg, #004085, #007BFF); /* ciemniejszy niebieski gradient */
+    max-width: 190px;
+    color: white;
+    padding: 20px;
+    align-items: center; /* wyśrodkowanie w pionie */
+    text-align: center;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+    .field-tile:hover {
+        transform: scale(1.05);
+    }

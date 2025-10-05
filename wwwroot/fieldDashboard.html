@@ -1,0 +1,252 @@
+﻿<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twój Filskane</title>
+    <link rel="stylesheet" href="css/fieldDashboardStyle.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+
+</head>
+<body>
+    <div class="content">
+        <h2 class="title"></h2>
+
+        <div class="fieldContent">
+            <div class="fieldScan">
+                <p>Data ostatniego skanu:</p>
+            </div>
+            <div class="field">
+                <div class="actions">
+                    <button>Skanuj najnowsze</button>
+                    <button>Analiza NVDI</button>
+                    <button>Historia skanów</button>
+                </div>
+
+                <br /><h3>Informacje:</h3><br />
+
+                <div class="fieldInfo">
+                    <table>
+                        <tr>
+                            <td><h4>Nazwa pola:</h4></td>
+                            <td><p id="fieldName" class="colConst"></p></td>
+                        </tr>
+
+                        <tr>
+                            <td><h4>Powierzchnia:</h4></td>
+                            <td><p id="area" class="colConst"></p></td>
+                        </tr>
+
+                        <tr>
+                            <td><h4>Uprawa:</h4></td>
+                            <td><p id="crop" class="colConst"></p></td>
+                            <td>
+                                <a href="#" class="edit-btn" data-field="crop">
+                                    <i class="fa-regular fa-pen-to-square"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><h4>Stan:</h4></td>
+                            <td><p id="state" class="colConst"></p></td>
+                            <td>
+                                <a href="#" class="edit-btn" data-field="state">
+                                    <i class="fa-regular fa-pen-to-square"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><h4>Data obsiania:</h4></td>
+                            <td><p id="date" class="colConst"></p></td>
+                            <td>
+                                <a href="#" class="edit-btn" data-field="date">
+                                    <i class="fa-regular fa-pen-to-square"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><h4>Kompleks:</h4></td>
+                            <td><p id="complex" class="colConst"></p></td>
+                        </tr>
+
+                        <tr>
+                            <td><h4>Typ gleby:</h4></td>
+                            <td><p id="type" class="colConst"></p></td>
+                        </tr>
+
+                        <tr>
+                            <td><h4>Podłoże (1):</h4></td>
+                            <td><p id="substrate" class="colConst"></p></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div id="cropModal" class="modal">
+        <div class="modal-content">
+            <h3>Wprowadź nową nazwę uprawy:</h3>
+            <form id="editForm">
+                <input type="text" id="cropInput">
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-cancel">Anuluj</button>
+                    <button type="submit" class="btn-save">Zapisz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="stateModal" class="modal">
+        <div class="modal-content">
+            <h3>Wprowadź nowy stan pola:</h3>
+            <form id="editForm">
+                <input type="text" id="stateInput">
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-cancel">Anuluj</button>
+                    <button type="submit" class="btn-save">Zapisz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="dateModal" class="modal">
+        <div class="modal-content">
+            <h3>Wprowadź nową datę siewu:</h3>
+            <form id="editForm">
+                <input type="date" id="dateInput">
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-cancel">Anuluj</button>
+                    <button type="submit" class="btn-save">Zapisz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <footer>
+        <p>&copy; 2024 Moja Strona. Wszelkie prawa zastrzeżone.</p>
+    </footer>
+
+    <script>
+        const token = localStorage.getItem("token");
+        const params = new URLSearchParams(window.location.search);
+        const fieldId = params.get("fieldId");
+
+        const cropEl = document.querySelector("#crop");
+        const stateEl = document.querySelector("#state");
+        const dateEl = document.querySelector("#date");
+
+        const cropInput = document.querySelector("#cropInput");
+        const stateInput = document.querySelector("#stateInput");
+        const dateInput = document.querySelector("#dateInput");
+
+        // pobieranie danych z backendu
+        fetch(`/api/field/getData/${fieldId}`, {
+            method: "GET",
+            headers: { "Authorization": "Bearer " + token }
+        })
+            .then(response => {
+                if (!response.ok) throw new Error("Błąd: " + response.status);
+                return response.json();
+            })
+            .then(data => {
+                document.querySelector(".title").textContent = `Pole: ${data.name}`;
+                document.querySelector("#fieldName").textContent = data.name;
+                document.querySelector("#area").textContent = (data.area / 10000).toFixed(4) + " ha";
+                cropEl.textContent = data.crop;
+                stateEl.textContent = data.plantState;
+                dateEl.textContent = data.sowingDate;
+                document.querySelector("#complex").textContent = data.soilComplex;
+                document.querySelector("#type").textContent = data.soilType;
+                document.querySelector("#substrate").textContent = data.soilSubstrate;
+            })
+            .catch(err => console.error(err));
+
+        // Obsługa przycisków edycji
+        document.querySelectorAll(".edit-btn").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.preventDefault();
+                const field = btn.dataset.field;
+
+                if (field === "crop") {
+                    cropEl.value = "";
+                    cropInput.placeholder = cropEl.textContent;
+                    document.getElementById("cropModal").style.display = "block";
+                }
+                if (field === "state") {
+                    stateInput.value = "";
+                    stateInput.placeholder = stateEl.textContent;
+                    document.getElementById("stateModal").style.display = "block";
+                }
+                if (field === "date") {
+                    document.getElementById("dateModal").style.display = "block";
+                }
+            });
+        });
+
+        document.querySelectorAll(".modal").forEach(modal => {
+            const cancelBtn = modal.querySelector(".btn-cancel");
+
+            cancelBtn.onclick = () => modal.style.display = "none";
+
+            window.addEventListener("click", (event) => {
+                if (event.target === modal) {
+                    modal.style.display = "none";
+                }
+            });
+        });
+
+        // Zapis w cropModal
+        document.querySelector("#cropModal form").addEventListener("submit", (e) => {
+            e.preventDefault();
+            cropEl.textContent = cropInput.value;
+            updateField({ crop: cropInput.value });
+            document.getElementById("cropModal").style.display = "none";
+        });
+
+        // Zapis w stateModal
+        document.querySelector("#stateModal form").addEventListener("submit", (e) => {
+            e.preventDefault();
+            stateEl.textContent = stateInput.value;
+            updateField({ plantState: stateInput.value });
+            document.getElementById("stateModal").style.display = "none";
+        });
+
+        // Zapis w dateModal
+        document.querySelector("#dateModal form").addEventListener("submit", (e) => {
+            e.preventDefault();
+            dateEl.textContent = dateInput.value;
+            updateField({ sowingDate: dateInput.value });
+            document.getElementById("dateModal").style.display = "none";
+        });
+
+        // Funkcja aktualizacji w backendzie
+        function updateField(payload) {
+            fetch(`/api/field/update/${fieldId}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + token
+                },
+                body: JSON.stringify(payload)
+            })
+                .then(async res => {
+                    if (!res.ok) {
+                        const err = await res.json(); // teraz jest JSON { error: "..." }
+                        throw new Error(err.error || "Błąd zapisu");
+                    }
+                    return res.json();
+                })
+                .then(updated => {
+                    console.log("Zaktualizowano:", updated);
+                })
+                .catch(err => console.log("Błąd zapisu: " + err.message));
+        }
+    </script>
+</body>
+</html>

@@ -6,5 +6,7 @@
         public string Name { get; set; }
         public string Email { get; set; }
         public string Telephone { get; set; }
+        public double? FarmX { get; set; }
+        public double? FarmY { get; set; }
     }
 }

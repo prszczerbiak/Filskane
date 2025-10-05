@@ -1,0 +1,238 @@
+﻿body {
+    font-family: Arial, sans-serif;
+    background-color: #f8f8f8;
+    text-align: center;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%; /* Upewnij się, że body i html mają wysokość 100% */
+}
+
+.content {
+    border: 5px solid green; /* Zielona ramka */
+    width: calc(100% - 100px); /* Pełna szerokość strony */
+    min-height: calc(100vh - 120px); /* Wypełnia całą wysokość ekranu minus stopka */
+    padding: 20px; /* Odstęp od krawędzi ramki */
+    box-sizing: border-box; /* Zapobiega rozpychaniu ramki przez padding */
+    background-color: white; /* Opcjonalne tło */
+    border-radius: 15px; /* Zaokrąglone rogi ramki */
+    margin: 20px 50px 20px 50px;
+    display: flex; /* Ustawiamy Flexbox na elemencie .content */
+    justify-content: center; /* Wyśrodkowanie poziome */
+    align-items: center; /* Wyśrodkowanie pionowe */
+    flex-direction: column; /* Umożliwia ewentualne dodanie nagłówka nad kafelkami */
+}
+
+#map {
+    height: 500px;
+    width: calc(100% - 100px);
+    border-radius: 10px;
+    border: none;
+}
+
+.modal {
+    display: none; /* domyślnie ukryty */
+    position: fixed;
+    z-index: 2000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    justify-content: center;
+    align-items: center;
+}
+
+.modalContent {
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    max-width: 400px;
+    margin: auto;
+    text-align: center;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    font-weight: bold;
+    z-index: 3001;
+}
+
+.modalActions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: space-around;
+}
+
+    .modalActions button {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+
+.transparentModalContent {
+    background: transparent;
+    padding: 20px;
+    max-width: 1200px;
+    width: 90%;
+    text-align: center;
+    color: white;
+}
+
+    .transparentModalContent button {
+        margin: 10px;
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        border: none;
+        border-radius: 5px;
+    }
+
+#selectMap {
+    height: 400px;
+    width: 100%;
+    margin-bottom: 15px;
+    border-radius: 8px;
+}
+
+.leaflet-control-geocoder {
+    background: rgba(255, 255, 255, 0.8) !important; /* półprzeźroczyste tło */
+    border-radius: 6px;
+    padding: 4px;
+    display: flex !important; /* zawsze widoczne */
+    align-items: center;
+}
+
+.leaflet-control-geocoder-form {
+    display: block !important; /* input zawsze widoczny */
+}
+
+.leaflet-control-geocoder-icon {
+    display: none !important; /* ukryj ikonkę lupy */
+}
+
+.leaflet-control-geocoder input {
+    border: none;
+    outline: none;
+    background: transparent;
+    width: 200px; /* szerokość pola */
+}
+
+#moveFarmBtn,
+#infoFieldBtn{
+    display: block;
+    margin: 5px auto;
+    color: white;
+    cursor: pointer;
+    border: none;
+    border-radius: 5px;
+    padding: 5px 10px;
+    font-size: 13px;
+}
+
+#deleteFarmBtn,
+#deleteFieldBtn{
+    display: block;
+    margin: 5px auto;
+    color: white;
+    cursor: pointer;
+    border: none;
+    border-radius: 5px;
+    padding: 5px 10px;
+    font-size: 13px;
+}
+
+.btn-success {
+    background-color: #28a745;
+    color: white;
+}
+
+    .btn-success:hover {
+        background-color: #218838;
+    }
+
+.btn-primary {
+    background-color: #007BFF;
+    color: white;
+}
+
+    .btn-primary:hover {
+        background-color: #0056b3;
+    }
+
+.btn-cancel {
+    background: #ccc;
+}
+    .btn-cancel:hover {
+        background: #999;
+    }
+
+.btn-danger {
+    background: red;
+    color: white;
+}
+
+    .btn-danger:hover {
+        background: #b22222;
+    }
+
+.add-field-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px; /* odstęp między plusem a tekstem */
+    background-color: #007bff; /* niebieski */
+    color: white;
+    font-weight: bold;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+    .add-field-btn .plus-icon {
+        font-size: 18px;
+        font-weight: bold;
+        color: white; /* biały plus */
+    }
+
+    .add-field-btn:hover {
+        background-color: #0056b3; /* ciemniejszy niebieski */
+    }
+
+#addFieldMap {
+    height: 600px;
+    width: 100%;
+    margin-bottom: 15px;
+    border-radius: 8px;
+}
+
+#fieldNameInput {
+    width: 50%; /* zajmuje całą szerokość kontenera */
+    padding: 10px 12px; /* wewnętrzne marginesy dla wygody pisania */
+    font-size: 16px; /* czytelny rozmiar czcionki */
+    border: 1px solid #ccc; /* delikatna ramka */
+    border-radius: 6px; /* zaokrąglone rogi */
+    box-sizing: border-box; /* padding wliczony w szerokość */
+    margin: 10px 0 20px 0; /* odstępy od góry i dołu */
+    transition: border-color 0.3s, box-shadow 0.3s; /* płynna zmiana przy fokusie */
+}
+
+    #fieldNameInput:focus {
+        border-color: #007bff; /* niebieska ramka przy fokusie */
+        box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+        outline: none; /* usuwa domyślny efekt focus */
+    }
+
+footer {
+    background-color: green; /* Zielone tło */
+    color: white; /* Biały tekst */
+    text-align: center; /* Wyśrodkowanie tekstu */
+    padding: 15px; /* Wewnętrzny odstęp */
+    /*position: fixed; /* Przyklejenie stopki do dołu */
+    bottom: 0;
+    left: 0; /* Przypięcie do lewej strony */
+    width: 100%; /* Pełna szerokość ekranu */
+    box-sizing: border-box; /* Zapobiega przesunięciom przez padding */
+}

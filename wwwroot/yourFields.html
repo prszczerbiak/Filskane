@@ -1,0 +1,58 @@
+﻿<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twój Filskane</title>
+    <link rel="stylesheet" href="css/yourFieldsStyle.css">
+
+</head>
+<body>
+    <div class="content">
+        <h2 class="title">Wybierz pole:</h2>
+        <div id="fields-container">
+
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2024 Moja Strona. Wszelkie prawa zastrzeżone.</p>
+    </footer>
+
+    <script>
+        async function loadFields() {
+            try {
+                const response = await fetch('/api/fieldsList', {
+                    headers: {
+                        'Authorization': 'Bearer ' + localStorage.getItem('token') // token JWT
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error("Błąd pobierania pól: " + response.status);
+                }
+
+                const fields = await response.json();
+                const container = document.getElementById('fields-container');
+                container.innerHTML = '';
+
+                fields.forEach(f => {
+                    const tile = document.createElement('div');
+                    tile.className = 'field-tile';
+                    tile.innerHTML = `<h3>${f.name}</h3>`;
+
+                    tile.addEventListener('click', () => {
+                        // przekierowanie na stronę fieldDashboard z id pola w query string
+                        window.location.href = `/fieldDashboard.html?fieldId=${f.fieldId}`;
+                    });
+                    container.appendChild(tile);
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        loadFields();
+    </script>
+</body>
+</html>
