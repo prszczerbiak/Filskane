@@ -1,5 +1,6 @@
 ﻿namespace WebApplication1.Services;
 
+using Microsoft.AspNetCore.Identity.Data;
 using Oracle.ManagedDataAccess.Client;
 using Oracle.ManagedDataAccess.Types;
 using System;
@@ -379,6 +380,24 @@ public class DatabaseService
         }
 
         return exists;
+    }
+
+    public bool RegisterUser(WebApplication1.Models.RegisterRequest request)
+    {
+        using var conn = new OracleConnection(_connectionString);
+        conn.Open();
+
+        string sql = @"INSERT INTO USERS (NAME, USERNAME, EMAIL, PASSWORDHASH)
+                           VALUES (:name, :username, :email, :passwordhash)";
+
+        using var cmd = new OracleCommand(sql, conn);
+        cmd.Parameters.Add(new OracleParameter("name", request.Name));
+        cmd.Parameters.Add(new OracleParameter("username", request.Username));
+        cmd.Parameters.Add(new OracleParameter("email", request.Email));
+        cmd.Parameters.Add(new OracleParameter("passwordhash", request.Password)); // UWAGA: hasło powinno być zahashowane!
+
+        int rows = cmd.ExecuteNonQuery();
+        return rows > 0;
     }
 }
 

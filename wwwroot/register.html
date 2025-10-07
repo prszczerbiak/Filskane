@@ -38,7 +38,7 @@
                 <div class="terms">
                     <input type="checkbox" id="acceptTerms">
                     <label for="acceptTerms">
-                        Zapoznałem/am się z
+                        Zapoznałem/am się* z
                         <a href="/regulamin" target="_blank">regulaminem</a>
                     </label>
                 </div>
@@ -57,188 +57,196 @@
     </footer>
 
     <script>
-        const form = document.getElementById('registerForm');
+        document.addEventListener("DOMContentLoaded", () => {
+            const form = document.getElementById("registerForm");
+            const fields = {
+                name: document.getElementById("name"),
+                username: document.getElementById("username"),
+                email: document.getElementById("email"),
+                password: document.getElementById("password"),
+                againPassword: document.getElementById("againPassword"),
+                terms: document.getElementById("acceptTerms")
+            };
 
-        form.addEventListener('submit', function (e) {
-            e.preventDefault(); // blokuje domyślne wysyłanie formularza
+            const errors = {
+                name: document.getElementById("errorName"),
+                username: document.getElementById("errorUsername"),
+                email: document.getElementById("errorEmail"),
+                password: document.getElementById("errorPassword"),
+                againPassword: document.getElementById("errorAgainPassword"),
+                successPassword: document.getElementById("successAgainPassword"),
+                terms: document.getElementById("errorTerms"),
+                emailMessage: document.getElementById("emailMessage"),
+                passwordInfo: document.getElementById("passwordInfo")
+            };
 
-            // Pobieranie pól
-            const name = document.getElementById('name');
-            const username = document.getElementById('username');
-            const email = document.getElementById('email');
-            const password = document.getElementById('password');
-            const againPassword = document.getElementById('againPassword');
+            // 🧩 WALIDACJE FRONTENDOWE
 
-            // Flaga, czy wszystko jest poprawnie wypełnione
-            let valid = true;
-
-            // Funkcja pomocnicza do sprawdzania pól
-            function checkField(field, errorDivId) {
-                const errorDiv = document.getElementById(errorDivId);
+            // Sprawdzanie pojedynczego pola
+            function checkField(field, errorEl) {
                 if (!field.value.trim()) {
-                    errorDiv.style.display = 'block';
-                    valid = false;
-                } else {
-                    errorDiv.style.display = 'none';
+                    errorEl.style.display = "block";
+                    return false;
                 }
+                errorEl.style.display = "none";
+                return true;
             }
 
-            // Sprawdzenie każdego pola
-            checkField(name, 'errorName');
-            checkField(username, 'errorUsername');
-            checkField(email, 'errorEmail');
-            checkField(password, 'errorPassword');
-
-            // Jeśli wszystko poprawnie wypełnione, można wysłać formularz
-            if (valid) {
-                form.submit(); // lub tutaj możesz zrobić np. AJAX
-            }
-        });
-
-        async function checkEmail() {
-            const emailInput = document.getElementById('email');
-            const email = emailInput.value.trim();
-            const messageDiv = document.getElementById('emailMessage');
-
-            // 🔹 Najpierw prosta walidacja po stronie klienta (nie wysyłaj błędnych danych)
-            const emailPattern = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-
-            if (!email) {
-                messageDiv.textContent = "";
-                return;
+            // Walidacja hasła
+            function isValidPassword(password) {
+                return (
+                    password.length >= 7 &&
+                    /[A-Z]/.test(password) &&
+                    /[a-z]/.test(password) &&
+                    /\d/.test(password) &&
+                    /[!@#$%^&*(),.?":{}|<>_\-+=/\\[\]]/.test(password)
+                );
             }
 
-            if (!emailPattern.test(email)) {
-                messageDiv.textContent = "Nieprawidłowy format adresu e-mail ❌";
-                messageDiv.style.color = "red";
-                return;
-            }
+            // Sprawdzanie poprawności powtórzenia hasła
+            function checkPasswordsMatch() {
+                const pass = fields.password.value;
+                const again = fields.againPassword.value;
 
-            // 🔹 Jeśli format OK — sprawdź w bazie przez API
-            try {
-                const response = await fetch('/api/auth/check-email', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email })
-                });
-
-                // Backend zwraca { exists: true } lub { exists: false }
-                const data = await response.json();
-
-                if (response.status === 400) {
-                    // np. gdy backend zwróci "Nieprawidłowy format adresu e-mail"
-                    messageDiv.textContent = data.message || "Błąd danych wejściowych ❌";
-                    messageDiv.style.color = "red";
+                if (!again) {
+                    errors.againPassword.style.display = "none";
+                    errors.successPassword.style.display = "none";
                     return;
                 }
 
-                if (data.exists) {
-                    messageDiv.textContent = "Email jest już zajęty ❌";
-                    messageDiv.style.color = "red";
+                if (pass === again) {
+                    errors.againPassword.style.display = "none";
+                    errors.successPassword.style.display = "block";
                 } else {
-                    messageDiv.textContent = "Email jest dostępny ✅";
-                    messageDiv.style.color = "green";
+                    errors.againPassword.style.display = "block";
+                    errors.successPassword.style.display = "none";
                 }
-            } catch (error) {
-                console.error("Błąd połączenia:", error);
-                messageDiv.textContent = "Błąd połączenia z serwerem ❌";
-                messageDiv.style.color = "red";
-            }
-        }
-
-        const passwordInput = document.getElementById("password");
-        const againPasswordInput = document.getElementById("againPassword");
-        const errorAgainPassword = document.getElementById("errorAgainPassword");
-        const successAgainPassword = document.getElementById("successAgainPassword");
-        const passwordInfo = document.getElementById("passwordInfo");
-        const errorPassword = document.getElementById("errorPassword");
-
-        passwordInput.addEventListener("input", () => {
-            const password = passwordInput.value;
-
-            // 🔹 Reguły walidacji hasła:
-            const hasMinLength = password.length >= 7;
-            const hasUppercase = /[A-Z]/.test(password);
-            const hasLowercase = /[a-z]/.test(password);
-            const hasDigit = /\d/.test(password);
-            const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>_\-+=/\\[\]]/.test(password);
-
-            const isValid =
-                hasMinLength && hasUppercase && hasLowercase && hasDigit && hasSpecialChar;
-
-            // 🔹 Zmieniamy kolory komunikatu:
-            if (password === "") {
-                passwordInfo.classList.remove("valid", "invalid");
-                errorPassword.style.display = "block";
-            } else {
-                errorPassword.style.display = "none";
-                passwordInfo.classList.add(isValid ? "valid" : "invalid");
-                passwordInfo.classList.remove(isValid ? "invalid" : "valid");
-            }
-        });
-
-        // 🔹 Dodatkowa walidacja przy próbie wysłania formularza (jeśli masz formularz)
-        // document.querySelector("form").addEventListener("submit", (e) => {
-        //     if (!isValidPassword(passwordInput.value)) {
-        //         e.preventDefault();
-        //         errorPassword.style.display = "block";
-        //         passwordInfo.classList.add("invalid");
-        //     }
-        // });
-
-        // 🔹 Pomocnicza funkcja (jeśli chcesz jej użyć też przy submit)
-        function isValidPassword(password) {
-            return (
-                password.length >= 7 &&
-                /[A-Z]/.test(password) &&
-                /[a-z]/.test(password) &&
-                /\d/.test(password) &&
-                /[!@#$%^&*(),.?":{}|<>_\-+=/\\[\]]/.test(password)
-            );
-        }
-
-        // 🔹 Walidacja drugiego pola (powtórzenia)
-        againPasswordInput.addEventListener("input", checkPasswordsMatch);
-
-        function checkPasswordsMatch() {
-            const password = passwordInput.value;
-            const againPassword = againPasswordInput.value;
-
-            if (!againPassword) {
-                errorAgainPassword.style.display = "none";
-                successAgainPassword.style.display = "none";
-                return;
             }
 
-            if (password === againPassword) {
-                errorAgainPassword.style.display = "none";
-                successAgainPassword.style.display = "block";
-            } else {
-                errorAgainPassword.style.display = "block";
-                successAgainPassword.style.display = "none";
+            // Sprawdzanie emaila po wpisaniu
+            window.checkEmail = async function() {
+                const email = fields.email.value.trim();
+                const msg = errors.emailMessage;
+                const pattern = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+
+                if (!email) {
+                    msg.textContent = "";
+                    return;
+                }
+
+                if (!pattern.test(email)) {
+                    msg.textContent = "Nieprawidłowy format adresu e-mail ❌";
+                    msg.style.color = "red";
+                    return;
+                }
+
+                try {
+                    const res = await fetch("/api/auth/check-email", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ email })
+                    });
+
+                    const data = await res.json();
+                    if (data.exists) {
+                        msg.textContent = "Email jest już zajęty ❌";
+                        msg.style.color = "red";
+                    } else {
+                        msg.textContent = "Email jest dostępny ✅";
+                        msg.style.color = "green";
+                    }
+                } catch {
+                    msg.textContent = "Błąd połączenia z serwerem ❌";
+                    msg.style.color = "red";
+                }
             }
-        }
 
-        const errorTerms = document.getElementById("errorTerms");
-        const checkbox = document.getElementById("acceptTerms");
+            // 🧠 Walidacja pełnego formularza
+            function validateForm() {
+                let valid = true;
 
-        form.addEventListener("submit", (e) => {
-            let valid = true;
+                valid &= checkField(fields.name, errors.name);
+                valid &= checkField(fields.username, errors.username);
+                valid &= checkField(fields.email, errors.email);
+                valid &= checkField(fields.password, errors.password);
 
-            // 🔹 Sprawdzenie akceptacji regulaminu
-            if (!checkbox.checked) {
-                errorTerms.style.display = "block";
-                valid = false;
-            } else {
-                errorTerms.style.display = "none";
+                if (!isValidPassword(fields.password.value)) {
+                    errors.passwordInfo.classList.add("invalid");
+                    valid = false;
+                } else {
+                    errors.passwordInfo.classList.remove("invalid");
+                }
+
+                if (fields.password.value !== fields.againPassword.value) {
+                    errors.againPassword.style.display = "block";
+                    valid = false;
+                } else {
+                    errors.againPassword.style.display = "none";
+                }
+
+                if (!fields.terms.checked) {
+                    errors.terms.style.display = "block";
+                    valid = false;
+                } else {
+                    errors.terms.style.display = "none";
+                }
+
+                return !!valid;
             }
 
-            // 🔹 (Tu możesz dodać inne walidacje — np. pól tekstowych i haseł)
+            // 🧩 REJESTRACJA (wysyłka danych)
+            async function registerUser() {
+                const payload = {
+                    name: fields.name.value.trim(),
+                    username: fields.username.value.trim(),
+                    email: fields.email.value.trim(),
+                    password: fields.password.value.trim()
+                };
 
-            if (!valid) {
-                e.preventDefault(); // zatrzymuje wysyłanie formularza
+                try {
+                    const response = await fetch("/api/auth/register", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        document.body.innerHTML = "<p>Rejestracja zakończona sukcesem. Przekierowuję...</p>";
+                        setTimeout(() => window.location.href = "verifyRegistration.html", 1500);
+                    } else {
+                        const data = await response.json();
+                        alert("❌ Błąd: " + (data.message || "Nie udało się zarejestrować użytkownika."));
+                    }
+                } catch (error) {
+                    console.error("Błąd połączenia:", error);
+                    alert("❌ Wystąpił problem z połączeniem z serwerem.");
+                }
             }
+
+            // 🧩 ZDARZENIA
+
+            // Walidacja hasła w trakcie pisania
+            fields.password.addEventListener("input", () => {
+                const isValid = isValidPassword(fields.password.value);
+                errors.passwordInfo.classList.toggle("valid", isValid);
+                errors.passwordInfo.classList.toggle("invalid", !isValid);
+            });
+
+            // Sprawdzanie powtórzenia hasła
+            fields.againPassword.addEventListener("input", checkPasswordsMatch);
+
+            // Sprawdzanie emaila
+            fields.email.addEventListener("blur", checkEmail);
+
+            // Wysyłka formularza
+            form.addEventListener("submit", async (e) => {
+                e.preventDefault();
+                if (validateForm()) {
+                    await registerUser();
+                }
+            });
         });
     </script>
+
 </body>
 </html>

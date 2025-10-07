@@ -1,10 +1,13 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.Data;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
+using Oracle.ManagedDataAccess.Client;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using WebApplication1.Services;
-using System.IdentityModel.Tokens.Jwt;
-using Microsoft.IdentityModel.Tokens;
 using WebApplication1.Models;
+using WebApplication1.Services;
 
 [Route("api/auth")]
 [ApiController]
@@ -12,7 +15,7 @@ public class AuthController : ControllerBase
 {
     private readonly DatabaseService _dbService;
     private readonly IConfiguration _config;
-
+    private readonly PasswordHasher<string> _passwordHasher = new PasswordHasher<string>();
 
     public AuthController(DatabaseService dbService, IConfiguration config)
     {
@@ -21,7 +24,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
-    public IActionResult Login([FromBody] LoginRequest request)
+    public IActionResult Login([FromBody] WebApplication1.Models.LoginRequest request)
     {
         if (_dbService.ValidateUser(request.Username, request.Password))
         {
@@ -59,6 +62,25 @@ public class AuthController : ControllerBase
         bool exists = _dbService.CheckIfEmailExists(request.Email);
 
         return Ok(new { exists });
+    }
+
+    [HttpPost("register")]
+    public IActionResult Register([FromBody] WebApplication1.Models.RegisterRequest request)
+    {
+        try
+        {
+            _dbService.RegisterUser(request);
+            return Ok(new { message = "Użytkownik zarejestrowany pomyślnie" });
+        }
+        catch (OracleException ex)
+        {
+            // Zwróć sensowny komunikat JSON, żeby frontend mógł to odczytać
+            return StatusCode(500, new { message = "Błąd bazy danych: " + ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Wewnętrzny błąd serwera: " + ex.Message });
+        }
     }
 }
 
