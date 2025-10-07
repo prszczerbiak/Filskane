@@ -1,0 +1,244 @@
+﻿<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logowanie Filskane</title>
+    <link rel="stylesheet" href="css/registerStyle.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Quicksand:wght@300..700&display=swap" rel="stylesheet">
+
+</head>
+<body>
+    <div class="content">
+        <div class="register_area">
+            <h2>Rejestracja</h2>
+            <form id="registerForm" novalidate>
+                <input type="text" id="name" placeholder="Imię*">
+                <div id="errorName" class="errorForm">Pole wymagane</div>
+
+                <input type="text" id="username" placeholder="Nazwa użytkownika*">
+                <div id="errorUsername" class="errorForm">Pole wymagane</div>
+
+                <input type="text" id="email" placeholder="Email*" onblur="checkEmail()">
+                <div id="emailMessage" style="font-size: 14px; margin-top: 5px;"></div>
+                <div id="errorEmail" class="errorForm">Pole wymagane</div>
+
+                <input type="text" placeholder="Telefon">
+
+                <input type="password" id="password" placeholder="Hasło*">
+                <div id="errorPassword" class="errorForm">Pole wymagane</div>
+                <div id="passwordInfo">Conajmniej 7 znaków, wielka i mała litery, cyfra oraz znak specjalny</div>
+
+                <input type="password" id="againPassword" placeholder="Powtórz hasło">
+                <div id="errorAgainPassword" class="errorForm">Hasła nie są takie same</div>
+                <div id="successAgainPassword" class="successForm" style="display:none;">Hasła są takie same ✅</div>
+
+                <div class="terms">
+                    <input type="checkbox" id="acceptTerms">
+                    <label for="acceptTerms">
+                        Zapoznałem/am się z
+                        <a href="/regulamin" target="_blank">regulaminem</a>
+                    </label>
+                </div>
+                <div id="errorTerms" class="errorForm">Musisz zaakceptować regulamin</div>
+
+                <button class="register" type="submit">Zarejestruj się</button>
+            </form>
+
+        </div>
+
+    </div>
+
+
+    <footer>
+        <p>&copy; 2024 Moja Strona. Wszelkie prawa zastrzeżone.</p>
+    </footer>
+
+    <script>
+        const form = document.getElementById('registerForm');
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault(); // blokuje domyślne wysyłanie formularza
+
+            // Pobieranie pól
+            const name = document.getElementById('name');
+            const username = document.getElementById('username');
+            const email = document.getElementById('email');
+            const password = document.getElementById('password');
+            const againPassword = document.getElementById('againPassword');
+
+            // Flaga, czy wszystko jest poprawnie wypełnione
+            let valid = true;
+
+            // Funkcja pomocnicza do sprawdzania pól
+            function checkField(field, errorDivId) {
+                const errorDiv = document.getElementById(errorDivId);
+                if (!field.value.trim()) {
+                    errorDiv.style.display = 'block';
+                    valid = false;
+                } else {
+                    errorDiv.style.display = 'none';
+                }
+            }
+
+            // Sprawdzenie każdego pola
+            checkField(name, 'errorName');
+            checkField(username, 'errorUsername');
+            checkField(email, 'errorEmail');
+            checkField(password, 'errorPassword');
+
+            // Jeśli wszystko poprawnie wypełnione, można wysłać formularz
+            if (valid) {
+                form.submit(); // lub tutaj możesz zrobić np. AJAX
+            }
+        });
+
+        async function checkEmail() {
+            const emailInput = document.getElementById('email');
+            const email = emailInput.value.trim();
+            const messageDiv = document.getElementById('emailMessage');
+
+            // 🔹 Najpierw prosta walidacja po stronie klienta (nie wysyłaj błędnych danych)
+            const emailPattern = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+
+            if (!email) {
+                messageDiv.textContent = "";
+                return;
+            }
+
+            if (!emailPattern.test(email)) {
+                messageDiv.textContent = "Nieprawidłowy format adresu e-mail ❌";
+                messageDiv.style.color = "red";
+                return;
+            }
+
+            // 🔹 Jeśli format OK — sprawdź w bazie przez API
+            try {
+                const response = await fetch('/api/auth/check-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+
+                // Backend zwraca { exists: true } lub { exists: false }
+                const data = await response.json();
+
+                if (response.status === 400) {
+                    // np. gdy backend zwróci "Nieprawidłowy format adresu e-mail"
+                    messageDiv.textContent = data.message || "Błąd danych wejściowych ❌";
+                    messageDiv.style.color = "red";
+                    return;
+                }
+
+                if (data.exists) {
+                    messageDiv.textContent = "Email jest już zajęty ❌";
+                    messageDiv.style.color = "red";
+                } else {
+                    messageDiv.textContent = "Email jest dostępny ✅";
+                    messageDiv.style.color = "green";
+                }
+            } catch (error) {
+                console.error("Błąd połączenia:", error);
+                messageDiv.textContent = "Błąd połączenia z serwerem ❌";
+                messageDiv.style.color = "red";
+            }
+        }
+
+        const passwordInput = document.getElementById("password");
+        const againPasswordInput = document.getElementById("againPassword");
+        const errorAgainPassword = document.getElementById("errorAgainPassword");
+        const successAgainPassword = document.getElementById("successAgainPassword");
+        const passwordInfo = document.getElementById("passwordInfo");
+        const errorPassword = document.getElementById("errorPassword");
+
+        passwordInput.addEventListener("input", () => {
+            const password = passwordInput.value;
+
+            // 🔹 Reguły walidacji hasła:
+            const hasMinLength = password.length >= 7;
+            const hasUppercase = /[A-Z]/.test(password);
+            const hasLowercase = /[a-z]/.test(password);
+            const hasDigit = /\d/.test(password);
+            const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>_\-+=/\\[\]]/.test(password);
+
+            const isValid =
+                hasMinLength && hasUppercase && hasLowercase && hasDigit && hasSpecialChar;
+
+            // 🔹 Zmieniamy kolory komunikatu:
+            if (password === "") {
+                passwordInfo.classList.remove("valid", "invalid");
+                errorPassword.style.display = "block";
+            } else {
+                errorPassword.style.display = "none";
+                passwordInfo.classList.add(isValid ? "valid" : "invalid");
+                passwordInfo.classList.remove(isValid ? "invalid" : "valid");
+            }
+        });
+
+        // 🔹 Dodatkowa walidacja przy próbie wysłania formularza (jeśli masz formularz)
+        // document.querySelector("form").addEventListener("submit", (e) => {
+        //     if (!isValidPassword(passwordInput.value)) {
+        //         e.preventDefault();
+        //         errorPassword.style.display = "block";
+        //         passwordInfo.classList.add("invalid");
+        //     }
+        // });
+
+        // 🔹 Pomocnicza funkcja (jeśli chcesz jej użyć też przy submit)
+        function isValidPassword(password) {
+            return (
+                password.length >= 7 &&
+                /[A-Z]/.test(password) &&
+                /[a-z]/.test(password) &&
+                /\d/.test(password) &&
+                /[!@#$%^&*(),.?":{}|<>_\-+=/\\[\]]/.test(password)
+            );
+        }
+
+        // 🔹 Walidacja drugiego pola (powtórzenia)
+        againPasswordInput.addEventListener("input", checkPasswordsMatch);
+
+        function checkPasswordsMatch() {
+            const password = passwordInput.value;
+            const againPassword = againPasswordInput.value;
+
+            if (!againPassword) {
+                errorAgainPassword.style.display = "none";
+                successAgainPassword.style.display = "none";
+                return;
+            }
+
+            if (password === againPassword) {
+                errorAgainPassword.style.display = "none";
+                successAgainPassword.style.display = "block";
+            } else {
+                errorAgainPassword.style.display = "block";
+                successAgainPassword.style.display = "none";
+            }
+        }
+
+        const errorTerms = document.getElementById("errorTerms");
+        const checkbox = document.getElementById("acceptTerms");
+
+        form.addEventListener("submit", (e) => {
+            let valid = true;
+
+            // 🔹 Sprawdzenie akceptacji regulaminu
+            if (!checkbox.checked) {
+                errorTerms.style.display = "block";
+                valid = false;
+            } else {
+                errorTerms.style.display = "none";
+            }
+
+            // 🔹 (Tu możesz dodać inne walidacje — np. pól tekstowych i haseł)
+
+            if (!valid) {
+                e.preventDefault(); // zatrzymuje wysyłanie formularza
+            }
+        });
+    </script>
+</body>
+</html>

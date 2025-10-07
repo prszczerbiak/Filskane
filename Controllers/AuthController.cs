@@ -49,5 +49,16 @@ public class AuthController : ControllerBase
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+
+    [HttpPost("check-email")]
+    public IActionResult CheckEmail([FromBody] EmailRequest request)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        bool exists = _dbService.CheckIfEmailExists(request.Email);
+
+        return Ok(new { exists });
+    }
 }
 

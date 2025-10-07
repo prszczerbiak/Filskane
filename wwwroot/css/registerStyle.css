@@ -1,0 +1,156 @@
+﻿body {
+    font-family: Arial, sans-serif;
+    background-color: #f8f8f8;
+    text-align: center;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%; /* Upewnij się, że body i html mają wysokość 100% */
+}
+
+h1 {
+    color: #333;
+}
+
+
+footer {
+    background-color: green; /* Zielone tło */
+    color: white; /* Biały tekst */
+    text-align: center; /* Wyśrodkowanie tekstu */
+    padding: 15px; /* Wewnętrzny odstęp */
+    /*position: fixed; /* Przyklejenie stopki do dołu */
+    bottom: 0;
+    left: 0; /* Przypięcie do lewej strony */
+    width: 100%; /* Pełna szerokość ekranu */
+    box-sizing: border-box; /* Zapobiega przesunięciom przez padding */
+}
+
+.content {
+    border: 5px solid green; /* Zielona ramka */
+    width: calc(100% - 40px); /* Pełna szerokość strony */
+    min-height: calc(100vh - 120px); /* Wypełnia całą wysokość ekranu minus stopka */
+    padding: 20px; /* Odstęp od krawędzi ramki */
+    box-sizing: border-box; /* Zapobiega rozpychaniu ramki przez padding */
+    background-color: white; /* Opcjonalne tło */
+    border-radius: 15px; /* Zaokrąglone rogi ramki */
+    margin: 20px;
+    display: flex; /* Ustawiamy Flexbox na elemencie .content */
+    justify-content: center;
+}
+
+.register_area {
+
+    width: 450px;
+    background: white;
+    padding: 20px;
+    text-align: center;
+}
+
+h2 {
+    margin-bottom: 20px;
+}
+
+input {
+    height: 50px;
+    width: 100%;
+    padding: 10px;
+    margin-top: 20px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-sizing: border-box;
+}
+
+.register {
+    width: 100%;
+    padding: 10px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    margin-top: 30px;
+}
+
+    .register:hover {
+        background-color: #218838;
+    }
+
+
+button {
+    transition: background-color 0.3s ease;
+}
+
+.errorForm {
+    color: red;
+    display: none;
+    text-align: left;
+    font-size: 14px;
+    margin-top: 5px;
+}
+
+#passwordInfo {
+    color: grey;
+    text-align: center;
+    font-size: 14px;
+    margin-top: 3px;
+}
+
+#passwordInfo {
+    font-size: 13px;
+    text-align: left;
+    margin-top: 4px;
+    color: gray;
+}
+
+    #passwordInfo.valid {
+        color: green;
+    }
+
+    #passwordInfo.invalid {
+        color: red;
+    }
+
+.successForm {
+    color: green;
+    font-size: 14px;
+    text-align: left;
+}
+
+.terms {
+    display: flex;
+    align-items: center; /* wyrównuje checkbox i tekst w jednej linii */
+    gap: 8px; /* odstęp między checkboxem a tekstem */
+    margin-top: 30px;
+    margin-left: 10px; /* odstęp od lewej strony */
+    font-size: 14px;
+    color: #333;
+    line-height: 1.4; /* poprawia pionowe wyrównanie tekstu */
+    user-select: none;
+}
+
+    .terms input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+        margin-top: 0; /* usuwa domyślny odstęp checkboxa */
+        vertical-align: middle; /* wyrównuje z tekstem */
+        accent-color: #333;
+    }
+
+    .terms label {
+        cursor: pointer;
+    }
+
+    .terms a {
+        color: #000;
+        text-decoration: underline;
+        font-weight: 500;
+    }
+
+        .terms a:hover {
+            text-decoration-thickness: 2px;
+        }
+

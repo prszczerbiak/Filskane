@@ -357,6 +357,29 @@ public class DatabaseService
         if (rowsAffected == 0)
             throw new Exception("Nie znaleziono pola lub brak uprawnień do edycji");
     }
+
+    public bool CheckIfEmailExists(string email)
+    {
+        bool exists = false;
+
+        using (var connection = new OracleConnection(_connectionString))
+        {
+            connection.Open();
+
+            string query = "SELECT COUNT(*) FROM USERS WHERE EMAIL = :email";
+            using (var command = new OracleCommand(query, connection))
+            {
+                command.Parameters.Add(new OracleParameter("email", email));
+
+                var result = command.ExecuteScalar();
+                int count = Convert.ToInt32(result);
+
+                exists = count > 0;
+            }
+        }
+
+        return exists;
+    }
 }
 
 
