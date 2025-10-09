@@ -15,6 +15,7 @@ builder.Services.AddSwaggerGen();
 
 // Odczytaj connection string i dodaj do DI
 builder.Services.AddSingleton(new DatabaseService(builder.Configuration.GetConnectionString("OracleDb")));
+builder.Services.AddSingleton<EmailService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

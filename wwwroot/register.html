@@ -211,8 +211,7 @@
                     });
 
                     if (response.ok) {
-                        document.body.innerHTML = "<p>Rejestracja zakończona sukcesem. Przekierowuję...</p>";
-                        setTimeout(() => window.location.href = "verifyRegistration.html", 1500);
+                        window.location.href = "verifyRegistration.html";
                     } else {
                         const data = await response.json();
                         alert("❌ Błąd: " + (data.message || "Nie udało się zarejestrować użytkownika."));

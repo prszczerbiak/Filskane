@@ -14,13 +14,17 @@ using WebApplication1.Services;
 public class AuthController : ControllerBase
 {
     private readonly DatabaseService _dbService;
+    private readonly EmailService _emailService;
     private readonly IConfiguration _config;
+    private readonly ILogger<EmailService> _logger;
     private readonly PasswordHasher<string> _passwordHasher = new PasswordHasher<string>();
 
-    public AuthController(DatabaseService dbService, IConfiguration config)
+    public AuthController(DatabaseService dbService, EmailService emailService, IConfiguration config, ILogger<EmailService> logger)
     {
         _dbService = dbService;
         _config = config;
+        _emailService = emailService;
+        _logger = logger;
     }
 
     [HttpPost("login")]
@@ -69,18 +73,43 @@ public class AuthController : ControllerBase
     {
         try
         {
-            _dbService.RegisterUser(request);
-            return Ok(new { message = "Użytkownik zarejestrowany pomyślnie" });
+            string token = GenerateVerificationToken();
+            _dbService.RegisterUser(request, token); // Zapisz użytkownika i token w DB
+
+            Task.Run(() => _emailService.SendVerificationEmail(request.Email, token));
+
+            return Ok(new { message = "Użytkownik zarejestrowany. Wysłano e-mail weryfikacyjny." });
         }
         catch (OracleException ex)
         {
-            // Zwróć sensowny komunikat JSON, żeby frontend mógł to odczytać
+            _logger.LogError(ex, "Błąd bazy danych podczas rejestracji użytkownika {Email}", request.Email);
             return StatusCode(500, new { message = "Błąd bazy danych: " + ex.Message });
+        }
+        catch (InvalidOperationException ex) // przechwytywane z EmailService
+        {
+            _logger.LogError(ex, "Błąd wysyłki maila dla {Email}", request.Email);
+            return StatusCode(500, new { message = "Błąd wysyłki maila: " + ex.Message });
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Nieoczekiwany błąd przy rejestracji użytkownika {Email}", request.Email);
             return StatusCode(500, new { message = "Wewnętrzny błąd serwera: " + ex.Message });
         }
+    }
+
+    public string GenerateVerificationToken()
+    {
+        return Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+    }
+
+    [HttpGet("verify")]
+    public IActionResult Verify([FromQuery] string token)
+    {
+        bool success = _dbService.VerifyUser(token);
+        if (success)
+            return Ok("Konto zostało aktywowane.");
+        else
+            return BadRequest("Nieprawidłowy lub wygasły token.");
     }
 }
 

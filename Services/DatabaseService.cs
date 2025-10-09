@@ -24,7 +24,8 @@ public class DatabaseService
         string sql = @"SELECT COUNT(*) 
             FROM Users 
             WHERE Username = :username 
-                AND PasswordHash = :password";
+                AND PasswordHash = :password
+                AND Verification = 1";
 
         using var cmd = new OracleCommand(sql, conn);
         
@@ -382,22 +383,52 @@ public class DatabaseService
         return exists;
     }
 
-    public bool RegisterUser(WebApplication1.Models.RegisterRequest request)
+    public bool RegisterUser(WebApplication1.Models.RegisterRequest request, string token)
     {
         using var conn = new OracleConnection(_connectionString);
         conn.Open();
 
-        string sql = @"INSERT INTO USERS (NAME, USERNAME, EMAIL, PASSWORDHASH)
-                           VALUES (:name, :username, :email, :passwordhash)";
+        string sql = @"INSERT INTO USERS (NAME, USERNAME, EMAIL, PASSWORDHASH, VERIFICATIONTOKEN)
+                           VALUES (:name, :username, :email, :passwordhash, :verificationToken)";
 
         using var cmd = new OracleCommand(sql, conn);
         cmd.Parameters.Add(new OracleParameter("name", request.Name));
         cmd.Parameters.Add(new OracleParameter("username", request.Username));
         cmd.Parameters.Add(new OracleParameter("email", request.Email));
         cmd.Parameters.Add(new OracleParameter("passwordhash", request.Password)); // UWAGA: hasło powinno być zahashowane!
+        cmd.Parameters.Add(new OracleParameter("verificationToken", token));
 
         int rows = cmd.ExecuteNonQuery();
         return rows > 0;
+    }
+
+    public bool VerifyUser(string token)
+    {
+        using (var conn = new OracleConnection(_connectionString))
+        {
+            conn.Open();
+
+            // 🔹 Sprawdź, czy istnieje użytkownik z tym tokenem
+            using (var checkCmd = new OracleCommand("SELECT COUNT(*) FROM Users WHERE VerificationToken = :token", conn))
+            {
+                checkCmd.Parameters.Add(new OracleParameter("token", token));
+                int count = Convert.ToInt32(checkCmd.ExecuteScalar());
+
+                if (count == 0)
+                {
+                    return false; // nie ma takiego tokena
+                }
+            }
+
+            // 🔹 Zaktualizuj kolumnę IsVerified i usuń token
+            using (var updateCmd = new OracleCommand(
+                "UPDATE Users SET Verification = 1, VerificationToken = NULL WHERE VerificationToken = :token", conn))
+            {
+                updateCmd.Parameters.Add(new OracleParameter("token", token));
+                int rowsAffected = updateCmd.ExecuteNonQuery();
+                return rowsAffected > 0; // true jeśli udało się zaktualizować
+            }
+        }
     }
 }
 
