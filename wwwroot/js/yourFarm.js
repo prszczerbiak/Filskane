@@ -182,6 +182,11 @@ function initAddFieldMap() {
         { layers: "dzialki", format: "image/png", transparent: true, attribution: "Geoportal KIEG" }
     ).addTo(addFieldMap);
 
+    dzialki.on('tileerror', function (errorEvent) {
+        console.error("❌ Błąd wczytywania kafelka WMS:", errorEvent);
+        alert("Nie udało się pobrać warstwy WMS (działki). Sprawdź połączenie lub adres serwera.");
+    });
+
     userFieldsLayer.eachLayer(layer => {
         L.geoJSON(layer.toGeoJSON(), {
             style: { color: '#008000', weight: 2, fillOpacity: 0.3 }

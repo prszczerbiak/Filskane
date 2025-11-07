@@ -1,20 +1,32 @@
 ﻿namespace WebApplication1.Services;
 
+using BitMiracle.LibTiff.Classic;
+using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.AspNetCore.Identity.Data;
 using Oracle.ManagedDataAccess.Client;
 using Oracle.ManagedDataAccess.Types;
+using OSGeo.GDAL;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Configuration;
+using System.Data;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
 using WebApplication1.Models;
 
 public class DatabaseService
 {
     private readonly string _connectionString;
+    private readonly string _gdalConnectionString;
 
-    public DatabaseService(string connectionString)
+    public DatabaseService(string connectionString, string gdalString)
     {
         _connectionString = connectionString;
+        _gdalConnectionString = gdalString;
     }
+            
+    
 
     public bool ValidateUser(string username, string password)
     {
@@ -157,21 +169,12 @@ public class DatabaseService
         INSERT INTO FIELDS (NAME, CENTERX, CENTERY, USERID, GEOJSON, AREA, SOILCOMPLEX, SOILTYPE, SOILSUBSTRATE)
         VALUES (:name, :centerX, :centerY, :userId, :geojson, :area, :soilComplex, :soilType, :soilSubstrate)";
 
-        using var clob = new OracleClob(conn);
-        
-        clob.Write(geojson.ToCharArray(), 0, geojson.Length);
 
         cmd.Parameters.Add(new Oracle.ManagedDataAccess.Client.OracleParameter(":name", name));
         cmd.Parameters.Add(new Oracle.ManagedDataAccess.Client.OracleParameter(":centerX", centerX));
         cmd.Parameters.Add(new Oracle.ManagedDataAccess.Client.OracleParameter(":centerY", centerY));
         cmd.Parameters.Add(new Oracle.ManagedDataAccess.Client.OracleParameter(":userId", userId));
-        var geojsonParam = new OracleParameter
-        {
-            ParameterName = ":geojson",
-            OracleDbType = OracleDbType.Clob,
-            Value = clob
-        };
-        cmd.Parameters.Add(geojsonParam);
+        cmd.Parameters.Add(new OracleParameter(":geojson", geojson));
         cmd.Parameters.Add(new Oracle.ManagedDataAccess.Client.OracleParameter(":area", area));
         cmd.Parameters.Add(new Oracle.ManagedDataAccess.Client.OracleParameter(":soilComplex", complex));
         cmd.Parameters.Add(new Oracle.ManagedDataAccess.Client.OracleParameter(":soilType", type));
@@ -430,6 +433,331 @@ public class DatabaseService
             }
         }
     }
+
+    public async Task SaveRasterAsync(byte[] rasterData, int fieldId, DateTime date, string bbox)
+    {
+        try
+        {
+            await using var conn = new OracleConnection(_connectionString);
+            await conn.OpenAsync();
+
+            OracleBlob blobParam = new(conn);
+            blobParam.Write(rasterData, 0, rasterData.Length);
+
+            // Begin a transaction
+            await using var transaction = await conn.BeginTransactionAsync();
+
+            // STEP 1: Insert an empty GeoRaster row
+            await using (var initCmd = conn.CreateCommand())
+            {
+                initCmd.Transaction = (OracleTransaction)transaction;
+
+                initCmd.CommandText = @"
+                INSERT INTO SATELLITE_SCANS (FIELD_ID, SCAN_DATE, RASTER, BBOX)
+                VALUES (:fieldId, :scanDate, MDSYS.SDO_GEOR.init('SATELLITE_SCANS_RDT'),:bbox)
+                RETURNING SCAN_ID INTO :newId";
+
+                initCmd.Parameters.Add(new OracleParameter(":fieldId", fieldId));
+                initCmd.Parameters.Add(new OracleParameter(":scanDate", date));
+                initCmd.Parameters.Add(new OracleParameter(":bbox", bbox));
+
+                var newIdParam = new OracleParameter(":newId", OracleDbType.Int32)
+                {
+                    Direction = ParameterDirection.Output
+                };
+                initCmd.Parameters.Add(newIdParam);
+
+                await initCmd.ExecuteNonQueryAsync();
+
+                var newId = ((OracleDecimal)newIdParam.Value).ToInt32();
+
+                // STEP 2: Import TIFF into the GeoRaster
+                await using (var importCmd = conn.CreateCommand())
+                {
+                    importCmd.Transaction = (OracleTransaction)transaction;
+
+                    importCmd.CommandText = @"
+                    DECLARE
+                      v_geor MDSYS.SDO_GEORASTER;
+                    BEGIN
+                      -- pobranie GeoRaster
+                      SELECT RASTER INTO v_geor
+                      FROM SATELLITE_SCANS
+                      WHERE SCAN_ID = :id
+                      FOR UPDATE;
+
+                      -- import z użyciem pełnej sygnatury
+                      SDO_GEOR.importFrom(
+                          v_geor,               -- GeoRaster
+                          'blocking=OPTIMALPADDING,blocksize=(256,256,3),compression=NONE',
+                          'TIFF',               -- r_sourceFormat
+                          :blob,                -- r_sourceBLOB
+                          NULL,                 -- h_sourceFormat
+                          NULL                  -- h_sourceCLOB
+                      );
+
+                      -- aktualizacja tabeli
+                      UPDATE SATELLITE_SCANS SET RASTER = v_geor WHERE SCAN_ID = :id;
+                    END;";
+
+                    importCmd.Parameters.Add(new OracleParameter(":id", newId));
+                    importCmd.Parameters.Add(new OracleParameter(":blob", blobParam));
+
+                    await importCmd.ExecuteNonQueryAsync();
+                }
+
+                // Commit once both steps succeed
+                await transaction.CommitAsync();
+                Console.WriteLine($"✅ TIFF imported successfully into row ID = {newId}");
+            }
+        }
+        catch (OracleException ex)
+        {
+            Console.WriteLine($"❌ OracleException: {ex.Message}");
+            Console.WriteLine($"ErrorCode: {ex.ErrorCode}, Number: {ex.Number}");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ General exception: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task SaveRasterAsyncGDAL(byte[] rasterData, int fieldId, DateTime date)
+    {
+        try
+        {
+            Gdal.AllRegister();
+
+            for (int i = 0; i < Gdal.GetDriverCount(); i++)
+            {
+                Driver drv = Gdal.GetDriver(i);
+                Console.WriteLine(drv.ShortName);
+            }
+
+            await using var conn = new OracleConnection(_connectionString);
+            await conn.OpenAsync();
+
+            await using var transaction = await conn.BeginTransactionAsync();
+
+            int newId;
+            // STEP 1: Insert an empty GeoRaster row
+            await using (var initCmd = conn.CreateCommand())
+            {
+                initCmd.Transaction = (OracleTransaction)transaction;
+
+                initCmd.CommandText = @"
+                INSERT INTO SATELLITE_SCANS (FIELD_ID, SCAN_DATE, RASTER)
+                VALUES (:fieldId, :scanDate, MDSYS.SDO_GEOR.init('SATELLITE_SCANS_RDT'))
+                RETURNING SCAN_ID INTO :newId";
+
+                initCmd.Parameters.Add(new OracleParameter(":fieldId", fieldId));
+                initCmd.Parameters.Add(new OracleParameter(":scanDate", date));
+
+                var newIdParam = new OracleParameter(":newId", OracleDbType.Int32)
+                {
+                    Direction = ParameterDirection.Output
+                };
+                initCmd.Parameters.Add(newIdParam);
+
+                await initCmd.ExecuteNonQueryAsync();
+                newId = ((OracleDecimal)newIdParam.Value).ToInt32();
+            }
+
+            // Załaduj byte[] do pamięci
+            string memPath = "/vsimem/temp.tif";
+            Gdal.FileFromMemBuffer(memPath, rasterData);
+
+            // Otwórz dataset z GDAL
+            Dataset srcDs = Gdal.Open(memPath, Access.GA_ReadOnly);
+
+
+            // Utwórz GeoRaster w Oracle
+            string oracleGeoRasterConn = $"georaster:{_gdalConnectionString},SATELLITE_SCANS,RASTER,id={newId}";
+            Driver geoRasterDriver = Gdal.GetDriverByName("GeoRaster");
+            if (geoRasterDriver == null)
+                throw new Exception("GDAL GeoRaster driver not found. Upewnij się, że GDAL został zbudowany z obsługą Oracle GeoRaster i wszystkie biblioteki Oracle Instant Client są w PATH.");
+
+            string[] options = new string[]
+            {
+                "SRID=4326",
+                "BLOCKXSIZE=512",
+                "BLOCKYSIZE=512",
+                "BLOCKBSIZE=4",
+                "INTERLEAVE=BIP",
+                "COMPRESS=NONE"
+            };
+
+            Dataset dstDs = geoRasterDriver.CreateCopy(oracleGeoRasterConn, srcDs, 0, options, null, null);
+            dstDs.FlushCache();
+            dstDs.Dispose();
+            srcDs.Dispose();
+
+            // Usuń dataset w pamięci
+            Gdal.Unlink(memPath);
+        }
+        catch (OracleException ex)
+        {
+            Console.WriteLine($"❌ OracleException: {ex.Message}");
+            Console.WriteLine($"ErrorCode: {ex.ErrorCode}, Number: {ex.Number}");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ General exception: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<string?> GetFieldPolygonAsync(int fieldId)
+    {
+        await using var conn = new OracleConnection(_connectionString);
+        await conn.OpenAsync();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT GEOJSON FROM FIELDS WHERE FIELDSID = :id";
+        cmd.Parameters.Add(":id", fieldId);
+
+        using var reader = await cmd.ExecuteReaderAsync(System.Data.CommandBehavior.SingleRow);
+        if (!await reader.ReadAsync() || reader.IsDBNull(0))
+            return null;
+
+        string geoJsonString = reader.GetString(0);
+
+        return geoJsonString;
+    }
+
+    public async Task<ScanResult?> GetLatestScanAsync(int fieldId)
+    {
+        try
+        {
+            using var conn = new OracleConnection(_connectionString);
+            await conn.OpenAsync();
+
+            using var cmd = new OracleCommand(@"
+                DECLARE
+                    gr MDSYS.SDO_GEORASTER;
+                    out_blob BLOB;
+                    scan_date DATE;
+                    bbox JSON;
+                    field_bbox JSON;
+                BEGIN
+                    BEGIN
+                        -- Pobranie najnowszego rasteru
+                        SELECT s.raster, s.scan_date, s.bbox, f.geojson
+                        INTO gr, scan_date, bbox, field_bbox
+                        FROM satellite_scans s
+                        JOIN FIELDS f ON s.FIELD_ID = f.FIELDSID
+                        WHERE s.field_id = :id
+                        ORDER BY s.scan_date DESC
+                        FETCH FIRST 1 ROWS ONLY;
+
+                    EXCEPTION
+                        WHEN NO_DATA_FOUND THEN
+                            gr := NULL;
+                            scan_date := NULL;
+                            bbox := NULL;
+                            field_bbox := NULL;
+                    END;
+
+                    IF gr IS NOT NULL THEN
+                        DBMS_LOB.CREATETEMPORARY(out_blob, TRUE);
+                        sdo_geor.exportTo(gr, '', 'TIFF', out_blob);
+                        :result := out_blob;
+                    ELSE
+                        :result := EMPTY_BLOB();
+                    END IF;
+
+                    :scanDate := scan_date;
+                    :bboxInfo := bbox;
+                    :fieldBbox := field_bbox;
+                END;", conn);
+
+            cmd.BindByName = true;
+
+            cmd.Parameters.Add("id", OracleDbType.Int32).Value = fieldId;
+            cmd.Parameters.Add("result", OracleDbType.Blob).Direction = ParameterDirection.Output;
+            cmd.Parameters.Add("scanDate", OracleDbType.Date).Direction = ParameterDirection.Output;
+            cmd.Parameters.Add("bboxInfo", OracleDbType.Json).Direction = ParameterDirection.Output;
+            cmd.Parameters.Add("fieldBbox", OracleDbType.Json).Direction = ParameterDirection.Output;
+
+            await cmd.ExecuteNonQueryAsync();
+
+            var blob = (OracleBlob)cmd.Parameters["result"].Value;
+            var oracleDate = cmd.Parameters["scanDate"].Value;
+            DateTime? scanDate = null;
+
+            if (oracleDate is Oracle.ManagedDataAccess.Types.OracleDate od && !od.IsNull)
+                scanDate = od.Value;
+
+            var bbox = cmd.Parameters["bboxInfo"].Value;
+            var fieldBbox = cmd.Parameters["fieldBbox"].Value;
+
+            if (blob == null || blob.Length == 0)
+                return null;
+
+            return new ScanResult
+            {
+                ScanDate = scanDate ?? DateTime.MinValue,
+                ImageBytes = blob.Value,
+                Bbox = bbox.ToString(),
+                FieldBbox = fieldBbox.ToString()
+            };
+
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Błąd w GetLatestScanAsync dla fieldId={fieldId}: {ex.Message}", ex);
+        }
+    }
+
+    public async Task<List<FieldScan>> GetFieldScansAsync(int fieldId)
+    {
+        // Tworzy połączenie do Oracle
+        using var conn = new OracleConnection(_connectionString);
+        await conn.OpenAsync();
+
+        // Wykonuje SQL SELECT
+        var cmd = new OracleCommand(@"SELECT SCAN_ID, FIELD_ID, SCAN_DATE
+                                  FROM SATELLITE_SCANS
+                                  WHERE FIELD_ID = :fieldId
+                                  ORDER BY SCAN_DATE DESC", conn);
+
+        cmd.Parameters.Add(new OracleParameter("fieldId", fieldId));
+
+        var scans = new List<FieldScan>();
+        var reader = await cmd.ExecuteReaderAsync();
+
+
+
+        while (await reader.ReadAsync())
+        {
+            var date = reader.IsDBNull(2) ? (DateTime?)null : reader.GetDateTime(2);
+            scans.Add(new FieldScan
+            {
+                Id = reader.GetInt32(0),
+                FieldId = reader.GetInt32(1),
+                ScanDate = (DateTime)date,
+            });
+        }
+
+        return scans;
+    }
+
+    public async Task<bool> DeleteScanAsync(int scanId)
+    {
+        using var conn = new Oracle.ManagedDataAccess.Client.OracleConnection(_connectionString);
+        await conn.OpenAsync();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"DELETE FROM SATELLITE_SCANS WHERE scan_id = :scanId";
+        cmd.Parameters.Add(new Oracle.ManagedDataAccess.Client.OracleParameter("scanId", scanId));
+
+        var rows = await cmd.ExecuteNonQueryAsync();
+        return rows > 0;
+    }
+
 }
 
 

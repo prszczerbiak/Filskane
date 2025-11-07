@@ -23,6 +23,7 @@ html, body {
     justify-content: center; /* Wyśrodkowanie poziome */
     align-items: center; /* Wyśrodkowanie pionowe */
     flex-direction: column; /* Umożliwia ewentualne dodanie nagłówka nad kafelkami */
+    position: relative;
 }
 
 .menu {
@@ -120,3 +121,24 @@ footer {
     width: 100%; /* Pełna szerokość ekranu */
     box-sizing: border-box; /* Zapobiega przesunięciom przez padding */
 }
+
+#logoutBtn {
+    background-color: white;
+    color: black;
+    border: 2px solid #28a745;
+    border-radius: 5px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+    position: absolute;
+    top: 20px; /* lub dopasuj wysokość nagłówka */
+    right: 20px;
+    margin-top: 1.5em;
+    margin-right: 1em;
+}
+
+    #logoutBtn:hover {
+        background-color: #28a745;
+        color: white;
+    }
