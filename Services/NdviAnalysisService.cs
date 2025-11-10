@@ -1,33 +1,49 @@
 ﻿using Microsoft.AspNetCore.Mvc.ModelBinding.Binders;
 using System.Security.Cryptography;
+using WebApplication1.Analysis;
 using WebApplication1.Models;
 using WebApplication1.Services.Agronomy;
+using WebApplication1.Utils;
+using static SkiaSharp.HarfBuzz.SKShaper;
 
 namespace WebApplication1.Services
 {
     public class NdviAnalysisService
     {
-        private readonly ThresholdSelector _thresholdSelector;
+        private readonly CropThresholdProvider _thresholdProvider;
 
-        public NdviAnalysisService(ThresholdSelector thresholdSelector)
+        public NdviAnalysisService(CropThresholdProvider thresholdProvider)
         {
-            _thresholdSelector = thresholdSelector;
+            _thresholdProvider = thresholdProvider;
         }
 
-        public byte[] GroupByRisk(NdviGroupRequest request, byte[] tiffFile)
+        public byte[] GroupByRisk(NdviGroupRequest request, byte[] tiffFile, string geoJsonPolygon, string bboxJson)
         {
-            // 🔹 1. Pobierz dane NDVI (tu na razie mock)
-            var pixels = ScanResult.CalculateNdvi(tiffFile);
+            // 🔹 1. Oblicz macierz NDVI z pliku TIFF
+            double[,] ndvi = ScanResult.CalculateNdvi(tiffFile);
 
-            // 🔹 2. Oblicz próg NDVI dla rośliny i daty
-            double threshold = _thresholdSelector.GetThreshold(request.CropType, request.SowingDate, DateTime.Now);
+            int height = ndvi.GetLength(0);
+            int width = ndvi.GetLength(1);
 
-            // 🔹 3. Oznacz piksele zagrożone
+            double[][] fieldNvdi = ImageUtils.GetPixelsInsidePolygon(width, height, geoJsonPolygon, bboxJson);
 
-            return null;
-            
+            var classyficator = new NdviClassifier(_thresholdProvider);
+            int[] labels = classyficator.Classify(fieldNvdi, ndvi, request.CropType,request.SowingDate);
+
+            // 🔹 2. Utwórz i wytrenuj model
+            var model = new BayesNDVI();
+            model.Train(fieldNvdi, labels);
+
+            // 🔹 3. Wykonaj predykcję (klasy ryzyka)
+            int[] classes = model.Predict(fieldNvdi);
+
+            // 🔹 4. Zamień wynikową macierz klas na obraz (lub inny format)
+            // Tu przykład: konwersja do GeoTIFF, PNG albo bajtowej reprezentacji.
+            byte[] overlayBytes = ImageUtils.CreateRiskOverlay(fieldNvdi,classes, width, height, 0.5f);
+
+            return overlayBytes;
         }
 
-        
+
     }
 }

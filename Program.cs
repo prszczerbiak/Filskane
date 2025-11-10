@@ -1,10 +1,11 @@
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Configuration;
-using WebApplication1.Services;
-using System.Configuration;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using System.Configuration;
 using System.Text;
+using WebApplication1.Analysis;
+using WebApplication1.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +18,8 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton(new DatabaseService(builder.Configuration.GetConnectionString("OracleDb"),builder.Configuration.GetConnectionString("GdalOracle")));
 builder.Services.AddSingleton<EmailService>();
 builder.Services.AddHttpClient<SentinelHubService>();
+builder.Services.AddTransient<CropThresholdProvider>();
+builder.Services.AddTransient<NdviAnalysisService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

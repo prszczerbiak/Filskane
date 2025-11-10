@@ -20,9 +20,11 @@ public class FieldController : ControllerBase
     public static extern IntPtr VSIGetMemFileBuffer(string filename, out long size, int unref);
 
     private readonly DatabaseService _db;
-    public FieldController(DatabaseService db)
+    private readonly NdviAnalysisService _analysisService;
+    public FieldController(DatabaseService db, NdviAnalysisService ndviAnalysisService)
     {
         _db = db;
+        _analysisService = ndviAnalysisService;
     }
 
     [HttpGet("getData/{fieldId}")]
@@ -47,7 +49,7 @@ public class FieldController : ControllerBase
 
         try
         {
-            _db.SaveFieldChanges(fieldId, username, updateDto);
+            _db.SaveFieldChanges(fieldId, updateDto);
 
             // pobierz zaktualizowane dane i zwróć je
             return Ok(new { success = true });
@@ -56,6 +58,19 @@ public class FieldController : ControllerBase
         {
             return BadRequest(new { error = ex.Message });
         }
+    }
+
+    [HttpGet("getCycle/{fieldId}")]
+    public IActionResult GetCycle(int fieldId)
+    {
+        //var username = User.Identity?.Name;
+        //if (string.IsNullOrEmpty(username))
+        //    return Unauthorized("Brak użytkownika w tokenie");
+        var cycle = _db.GetCycleById(fieldId);
+        if (cycle == null)
+            return NotFound(new { error = "Nie znaleziono cyklu" });
+
+        return Ok(cycle);
     }
 
     [HttpGet("latestScan/{fieldId}")]
@@ -292,9 +307,42 @@ public class FieldController : ControllerBase
         if (string.IsNullOrEmpty(request.CropType) || request.SowingDate == DateTime.MinValue)
             return BadRequest("Niepoprawne dane rośliny lub daty zasiewu.");
 
+        // 1️⃣ Pobierz najnowszy skan NDVI dla pola
         var result = await _db.GetLatestScanAsync(fieldId);
+        if (result == null)
+            return NotFound($"Brak skanu dla pola {fieldId}");
 
+        // 2️⃣ Wygeneruj klasy ryzyka
+        var overlay = _analysisService.GroupByRisk(request, result.ImageBytes, result.FieldBbox, result.Bbox);
 
-        return Ok(result);
+        // 3️⃣ Wyrenderuj mapę NDVI w formie heatmapy
+        var ndviMap = ScanResult.RenderNdviHeatmap(ScanResult.CalculateNdvi(result.ImageBytes));
+
+        // 4️⃣ Nałóż półprzezroczystą mapę ryzyka
+        var withOverlay = ImageUtils.ApplyRiskOverlay(ndviMap, overlay);
+
+        // 5️⃣ Dorysuj granice pola z GeoJSON
+        var finalImage = ImageUtils.DrawGeoJsonPolygonOnImage(withOverlay, result.FieldBbox, result.Bbox, true);
+
+        // 6️⃣ Zwróć obraz jako PNG
+        return File(finalImage, "image/png");
+    }
+
+    [HttpGet("getPlantsList")]
+    public async Task<IActionResult> GetPlantsList()
+    {
+        try
+        {
+            // Pobierz listę roślin z serwisu bazy danych
+            var plants = await _db.GetPlantsAsync();
+
+            // Zwróć w formacie JSON
+            return Ok(plants);
+        }
+        catch (Exception ex)
+        {
+            // Obsłuż błędy
+            return StatusCode(500, new { error = ex.Message });
+        }
     }
 }

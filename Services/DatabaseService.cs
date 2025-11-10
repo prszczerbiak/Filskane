@@ -269,22 +269,23 @@ public class DatabaseService
         conn.Open();
 
         string sql = @"
-        SELECT f.FieldsId,
-               f.Name, 
-               f.Crop, 
-               f.PlantState, 
-               f.SowingDate,
-               f.SoilComplex,
-               f.SoilType,
-               f.SoilSubstrate,
-               f.Area
-        FROM FIELDS f
-        JOIN USERS u ON f.UserId = u.UserId
-        WHERE u.Username = :username
-          AND f.FieldsId = :fieldId";
+            SELECT f.FieldsId,
+                   f.Name, 
+                   f.CropId,
+                   p.PlantName,        -- nazwa rośliny
+                   f.PlantState,
+                   g.CycleName,        -- nazwa cyklu
+                   f.SowingDate,
+                   f.SoilComplex,
+                   f.SoilType,
+                   f.SoilSubstrate,
+                   f.Area
+            FROM FIELDS f
+            LEFT JOIN PLANTS p ON f.CropId = p.PlantId
+            LEFT JOIN GROWTHCYCLES g ON f.PlantState = g.CycleId
+            WHERE f.FieldsId = :fieldId";
 
         using var cmd = new OracleCommand(sql, conn);
-        cmd.Parameters.Add(":username", OracleDbType.Varchar2).Value = username;
         cmd.Parameters.Add(":fieldId", OracleDbType.Int32).Value = fieldId;
 
         try
@@ -296,15 +297,20 @@ public class DatabaseService
                 {
                     FieldId = Convert.ToInt32(reader.GetValue(0)),
                     Name = reader.GetString(1),
-                    Crop = reader.IsDBNull(2) ? "Nieuzupełnione" : reader.GetString(2),
-                    PlantState = reader.IsDBNull(3) ? "Nieuzupełnione" : reader.GetString(3),
-                    SowingDate = reader.IsDBNull(4) ? "Nieuzupełnione" : reader.GetDateTime(4).ToString("dd-MM-yyyy"),
-                    SoilComplex = reader.IsDBNull(5) ? "Nieuzupełnione" : reader.GetString(5),
-                    SoilType = reader.IsDBNull(6) ? "Nieuzupełnione" : reader.GetString(6),
-                    SoilSubstrate = reader.IsDBNull(7) ? "Nieuzupełnione" : reader.GetString(7),
-                    Area = reader.IsDBNull(8) ? 0.0 : reader.GetDouble(8)
-            }
-            ;
+
+                    Crop = reader.IsDBNull(2) ? (int?)null : Convert.ToInt32(reader.GetValue(2)),
+                    PlantName = reader.IsDBNull(3) ? "Nieuzupełnione" : reader.GetString(3),
+
+                    PlantState = reader.IsDBNull(4) ? (int?)null : Convert.ToInt32(reader.GetValue(4)),
+                    CycleName = reader.IsDBNull(5) ? "Nieuzupełnione" : reader.GetString(5),
+
+                    SowingDate = reader.IsDBNull(6) ? "Nieuzupełnione" : reader.GetDateTime(6).ToString("dd-MM-yyyy"),
+                    SoilComplex = reader.IsDBNull(7) ? "Nieuzupełnione" : reader.GetString(7),
+                    SoilType = reader.IsDBNull(8) ? "Nieuzupełnione" : reader.GetString(8),
+                    SoilSubstrate = reader.IsDBNull(9) ? "Nieuzupełnione" : reader.GetString(9),
+                    Area = reader.IsDBNull(10) ? 0.0 : reader.GetDouble(10)
+                };
+
             }
             else
             {
@@ -317,50 +323,71 @@ public class DatabaseService
         }
     }
 
-    public void SaveFieldChanges(int fieldId, string username, UpdateFieldDto updateDto)
+    public void SaveFieldChanges(int fieldId, UpdateFieldDto updateDto)
+    {
+        if (updateDto.Crop == 0 || !updateDto.SowingDate.HasValue)
+            throw new ArgumentException("Crop i SowingDate muszą być podane, aby wyznaczyć cykl wzrostu.");
+
+        using var conn = new OracleConnection(_connectionString);
+        conn.Open();
+
+        using var cmd = conn.CreateCommand();
+
+        cmd.CommandText = @"
+        UPDATE FIELDS
+        SET 
+            CropId = :crop,
+            SowingDate = :dateSow,
+            PlantState = (
+                SELECT CycleId
+                FROM plantStates
+                WHERE PlantId = :cropSub
+                  AND :dateSowSub1 + minDays <= SYSDATE
+                  AND :dateSowSub2 + maxDays >= SYSDATE
+                FETCH FIRST 1 ROWS ONLY
+            )
+        WHERE FieldsId = :fieldId";
+
+        cmd.Parameters.Add(":crop", OracleDbType.Int32).Value = updateDto.Crop;
+        cmd.Parameters.Add(":dateSow", OracleDbType.Date).Value = updateDto.SowingDate.Value;
+        cmd.Parameters.Add(":cropSub", OracleDbType.Int32).Value = updateDto.Crop; //dlaczego muszę drugi raz deklarować?
+        cmd.Parameters.Add(":dateSowSub1", OracleDbType.Date).Value = updateDto.SowingDate.Value;
+        cmd.Parameters.Add(":dateSowSub2", OracleDbType.Date).Value = updateDto.SowingDate.Value;
+        cmd.Parameters.Add(":fieldId", OracleDbType.Int32).Value = fieldId;
+
+        Console.WriteLine(cmd.CommandText);
+        foreach (OracleParameter p in cmd.Parameters)
+            Console.WriteLine($"{p.ParameterName} = {p.Value}");
+
+        int rowsAffected = cmd.ExecuteNonQuery();
+        if (rowsAffected == 0)
+            throw new Exception("Nie znaleziono pola lub brak uprawnień do edycji");
+    }
+
+    public object GetCycleById(int fieldId)
     {
         using var conn = new OracleConnection(_connectionString);
         conn.Open();
 
-        var updates = new List<string>();
-        var cmd = new OracleCommand();
-        cmd.Connection = conn;
-
-        if (!string.IsNullOrEmpty(updateDto.Crop))
-        {
-            updates.Add("Crop = :crop");
-            cmd.Parameters.Add(":crop", OracleDbType.Varchar2).Value = updateDto.Crop;
-        }
-
-        if (!string.IsNullOrEmpty(updateDto.PlantState))
-        {
-            updates.Add("PlantState = :state");
-            cmd.Parameters.Add(":state", OracleDbType.Varchar2).Value = updateDto.PlantState;
-        }
-
-        if (updateDto.SowingDate.HasValue)
-        {
-            updates.Add("SowingDate = :dateSow");
-            cmd.Parameters.Add(":dateSow", OracleDbType.Date).Value = updateDto.SowingDate.Value;
-        }
-
-        if (!updates.Any())
-            throw new ArgumentException("Brak danych do aktualizacji");
-
-        string sql = $@"
-        UPDATE FIELDS f
-        SET {string.Join(", ", updates)}
-        WHERE f.FieldsId = :fieldId
-          AND f.UserId = (SELECT UserId FROM USERS WHERE Username = :username)";
-
-        cmd.CommandText = sql;
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+        SELECT CycleId, CycleName
+        FROM Fields f
+        LEFT JOIN GrowthCycles g ON (f.PlantState = g.CycleId)
+        WHERE fieldsId = :fieldId";
         cmd.Parameters.Add(":fieldId", OracleDbType.Int32).Value = fieldId;
-        cmd.Parameters.Add(":username", OracleDbType.Varchar2).Value = username;
 
-        int rowsAffected = cmd.ExecuteNonQuery();
+        using var reader = cmd.ExecuteReader();
+        if (reader.Read())
+        {
+            return new GetCycleDto
+            {
+                CycleId = reader.GetInt32(0),
+                CycleName = reader.GetString(1)
+            };
+        }
 
-        if (rowsAffected == 0)
-            throw new Exception("Nie znaleziono pola lub brak uprawnień do edycji");
+        return null;
     }
 
     public bool CheckIfEmailExists(string email)
@@ -758,6 +785,35 @@ public class DatabaseService
         return rows > 0;
     }
 
+    public async Task<List<PlantDto>> GetPlantsAsync()
+    {
+        var plants = new List<PlantDto>();
+
+        using (var conn = new OracleConnection(_connectionString))
+        {
+            await conn.OpenAsync();
+
+            var query = "SELECT plantId, plantName FROM plants ORDER BY plantName";
+
+            using (var cmd = new OracleCommand(query, conn))
+            using (var reader = await cmd.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    plants.Add(new PlantDto
+                    {
+                        Id = Convert.ToInt32(reader["plantId"]),
+                        Name = reader["plantName"].ToString()
+                    });
+                }
+            }
+
+            Console.WriteLine(plants.Count);
+        }
+
+        return plants;
+    }
 }
+
 
 

@@ -51,11 +51,7 @@
                         <tr>
                             <td><h4>Stan:</h4></td>
                             <td><p id="state" class="colConst"></p></td>
-                            <td>
-                                <a href="#" class="edit-btn" data-field="state">
-                                    <i class="fa-regular fa-pen-to-square"></i>
-                                </a>
-                            </td>
+                            
                         </tr>
                         <tr>
                             <td><h4>Data obsiania:</h4></td>
@@ -89,23 +85,11 @@
 
     <div id="cropModal" class="modal">
         <div class="modal-content">
-            <h3>Wprowadź nową nazwę uprawy:</h3>
+            <h3>Wybierz uprawę:</h3>
             <form id="editForm">
-                <input type="text" id="cropInput">
+                <select id="cropInput">
 
-                <div class="modal-footer">
-                    <button type="button" class="btn-cancel">Anuluj</button>
-                    <button type="submit" class="btn-save">Zapisz</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div id="stateModal" class="modal">
-        <div class="modal-content">
-            <h3>Wprowadź nowy stan pola:</h3>
-            <form id="editForm">
-                <input type="text" id="stateInput">
+                </select>
 
                 <div class="modal-footer">
                     <button type="button" class="btn-cancel">Anuluj</button>
@@ -200,6 +184,10 @@
         const dateInput = document.querySelector("#dateInput");
 
         // pobieranie danych z backendu
+        let selectedCropId = null;
+        let selectedPlantStateId = null;
+        let selectedSowingDate = null;
+
         fetch(`/api/field/getData/${fieldId}`, {
             method: "GET",
             headers: { "Authorization": "Bearer " + token }
@@ -208,18 +196,28 @@
                 if (!response.ok) throw new Error("Błąd: " + response.status);
                 return response.json();
             })
+
             .then(data => {
+                console.log(data)
                 document.querySelector(".title").textContent = `Pole: ${data.name}`;
                 document.querySelector("#fieldName").textContent = data.name;
                 document.querySelector("#area").textContent = (data.area / 10000).toFixed(4) + " ha";
-                cropEl.textContent = data.crop;
-                stateEl.textContent = data.plantState;
+
+                // Tekst do widoku
+                cropEl.textContent = data.plantName;
+                stateEl.textContent = data.cycleName;
                 dateEl.textContent = data.sowingDate;
+                const [day, month, year] = data.sowingDate.split("-");
+                selectedSowingDate = `${year}-${month}-${day}`;
                 document.querySelector("#complex").textContent = data.soilComplex;
                 document.querySelector("#type").textContent = data.soilType;
                 document.querySelector("#substrate").textContent = data.soilSubstrate;
+
+                // ID do pamięci / przyszłych aktualizacji
+                selectedCropId = data.crop;             // id rośliny
+                selectedPlantStateId = data.plantState; // id cyklu wzrostu
             })
-            .catch(err => console.error(err));
+            .catch(err => console.error("Błąd przy pobieraniu danych pola:", err));
 
         // Obsługa przycisków edycji
         document.querySelectorAll(".edit-btn").forEach(btn => {
@@ -229,13 +227,41 @@
 
                 if (field === "crop") {
                     cropEl.value = "";
-                    cropInput.placeholder = cropEl.textContent;
                     document.getElementById("cropModal").style.display = "block";
-                }
-                if (field === "state") {
-                    stateInput.value = "";
-                    stateInput.placeholder = stateEl.textContent;
-                    document.getElementById("stateModal").style.display = "block";
+                    cropInput.querySelectorAll('option:not([disabled])').forEach(o => o.remove());
+
+                    // Pobranie listy upraw z backendu
+                    fetch(`/api/field/getPlantsList`, {
+                        headers: {
+                            "Authorization": "Bearer " + token
+                        }
+                    })
+                        .then(res => {
+                            if (!res.ok) throw new Error("Błąd przy pobieraniu upraw");
+                            return res.json();
+                        })
+                        .then(plants => {
+                            // Wyczyść poprzednie opcje
+
+                            
+                            // Dodaj nowe opcje
+                            plants.forEach(p => {
+                                const option = document.createElement("option");
+                                option.value = p.id;
+                                option.textContent = p.name;
+                                cropInput.appendChild(option);
+                            });
+
+                            // Ustaw placeholder na aktualną wartość pola
+                            if (cropEl.textContent) {
+                                const match = Array.from(cropInput.options).find(o => o.textContent === cropEl.textContent);
+                                if (match) {
+                                    cropInput.value = match.value;
+                                    selectedCropId = match.value; // zapisz ID w zmiennej
+                                }
+                            }
+                        })
+                        .catch(err => console.error(err));
                 }
                 if (field === "date") {
                     document.getElementById("dateModal").style.display = "block";
@@ -258,24 +284,28 @@
         // Zapis w cropModal
         document.querySelector("#cropModal form").addEventListener("submit", (e) => {
             e.preventDefault();
-            cropEl.textContent = cropInput.value;
-            updateField({ crop: cropInput.value });
+            const selectedOption = cropInput.options[cropInput.selectedIndex];
+            cropEl.textContent = selectedOption.textContent;
+            selectedCropId = selectedOption.value;
+            console.log("Dane wysyłane do backendu:", {
+                crop: selectedCropId,
+                sowingDate: selectedSowingDate
+            });
+            updateField({ crop: selectedCropId, sowingDate: selectedSowingDate });
             document.getElementById("cropModal").style.display = "none";
-        });
-
-        // Zapis w stateModal
-        document.querySelector("#stateModal form").addEventListener("submit", (e) => {
-            e.preventDefault();
-            stateEl.textContent = stateInput.value;
-            updateField({ plantState: stateInput.value });
-            document.getElementById("stateModal").style.display = "none";
         });
 
         // Zapis w dateModal
         document.querySelector("#dateModal form").addEventListener("submit", (e) => {
             e.preventDefault();
-            dateEl.textContent = dateInput.value;
-            updateField({ sowingDate: dateInput.value });
+            selectedSowingDate = dateInput.value;
+            const [year, month, day] = dateInput.value.split("-");
+            dateEl.textContent = `${day}-${month}-${year}`;
+            console.log("Dane wysyłane do backendu:", {
+                crop: selectedCropId,
+                sowingDate: selectedSowingDate
+            });
+            updateField({ crop: selectedCropId, sowingDate: selectedSowingDate });
             document.getElementById("dateModal").style.display = "none";
         });
 
@@ -297,9 +327,33 @@
                     return res.json();
                 })
                 .then(updated => {
-                    console.log("Zaktualizowano:", updated);
+                    getCycleInfo();
                 })
                 .catch(err => console.log("Błąd zapisu: " + err.message));
+
+            
+        }
+
+        async function getCycleInfo() {
+            try {
+                const res = await fetch(`/api/field/getCycle/${fieldId}`, {
+                    headers: { "Authorization": "Bearer " + token }
+                });
+
+                if (!res.ok) {
+                    const text = await res.text(); // zamiast res.json()
+                    throw new Error(`Błąd serwera: ${res.status}, treść: ${text}`);
+                }
+                const data = await res.json();
+                console.log(data.cycleName)
+                selectedPlantStateId = data.cycleId;
+                stateEl.textContent = data.cycleName;
+
+            } catch (err) {
+                console.error("Błąd:", err.message);
+                return null;
+            }
+
         }
 
         //document.querySelector("#scanBtn").addEventListener("click", async () => {
@@ -546,6 +600,50 @@
                 img.alt = "❌ Nie udało się pobrać obrazu NDVI";
                 console.error(err);
             }
+        });
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const clusterButton = document.getElementById("clustering");
+            const ndviImage = document.getElementById("ndviImage");
+
+            clusterButton.addEventListener("click", async () => {
+                try {
+                    // 🔹 przykładowe ID pola (możesz dynamicznie wstawić z atrybutu data-field-id)
+
+                    // 🔹 przygotuj dane do analizy
+                    const request = {
+                        cropType: "Wheat",              // typ uprawy – możesz pobierać z formularza
+                        sowingDate: "2025-04-15T00:00"  // data siewu
+                    };
+
+                    // 🔹 zapytanie do kontrolera
+                    const response = await fetch(`/api/field/group/${fieldId}`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(request)
+                    });
+
+                    if (!response.ok) {
+                        const errText = await response.text();
+                        throw new Error(`Błąd serwera: ${response.status} – ${errText}`);
+                    }
+
+                    // 🔹 odbierz wynik (obraz PNG)
+                    const blob = await response.blob();
+                    const imageUrl = URL.createObjectURL(blob);
+
+                    // 🔹 podmień obraz w modalu
+                    ndviImage.src = imageUrl;
+
+                    console.log("Mapa ryzyka NDVI zaktualizowana!");
+                }
+                catch (err) {
+                    console.error(err);
+                    alert("Nie udało się przeprowadzić analizy NDVI. Sprawdź konsolę błędów.");
+                }
+            });
         });
 
     </script>
