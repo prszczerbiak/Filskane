@@ -2,8 +2,14 @@
 {
     public class NdviGroupRequest
     {
-        public string? ScanId { get; set; }
-        public string? CropType { get; set; }
-        public DateTime SowingDate { get; set; }
+        public int CycleId { get; set; }
+
+        public List<List<Double>> Ndvi { get; set; } = [];
+
+        public string? FieldGeojson { get; set; }
+
+        public string? ImageBbox { get; set; }
+
+        public bool DarkMode { get; set; } = false;
     }
 }

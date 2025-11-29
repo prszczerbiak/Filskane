@@ -1,6 +1,7 @@
 ﻿namespace WebApplication1.Services;
 
 using BitMiracle.LibTiff.Classic;
+using HarfBuzzSharp;
 using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.AspNetCore.Identity.Data;
 using Oracle.ManagedDataAccess.Client;
@@ -14,40 +15,45 @@ using System.Data;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using WebApplication1.Models;
+using WebApplication1.Utils;
 
 public class DatabaseService
 {
     private readonly string _connectionString;
     private readonly string _gdalConnectionString;
+    private readonly IPasswordHasherService _hasher;
 
-    public DatabaseService(string connectionString, string gdalString)
+    public DatabaseService(string connectionString, string gdalString, IPasswordHasherService hasher)
     {
         _connectionString = connectionString;
         _gdalConnectionString = gdalString;
+        _hasher = hasher;
     }
-            
-    
+
+
 
     public bool ValidateUser(string username, string password)
     {
         using var conn = new OracleConnection(_connectionString);
-        
         conn.Open();
-        string sql = @"SELECT COUNT(*) 
-            FROM Users 
-            WHERE Username = :username 
-                AND PasswordHash = :password
-                AND Verification = 1";
+
+        string sql = @"SELECT PasswordHash 
+                   FROM Users 
+                   WHERE Username = :username 
+                         AND Verification = 1";
 
         using var cmd = new OracleCommand(sql, conn);
-        
         cmd.Parameters.Add(":username", OracleDbType.Varchar2).Value = username;
-        cmd.Parameters.Add(":password", OracleDbType.Varchar2).Value = password; // Użyj hashowania!
 
-        int count = Convert.ToInt32(cmd.ExecuteScalar());
-        return count > 0;
-        
-        
+        var result = cmd.ExecuteScalar();
+
+        if (result == null || result == DBNull.Value)
+            return false;
+
+        string storedHash = result.ToString();
+
+        // Porównanie hashy — BCrypt
+        return _hasher.Verify(password, storedHash);
     }
 
     public UserInfo? GetUserInfo(string username)
@@ -88,6 +94,154 @@ public class DatabaseService
 
     }
 
+    public UserShortInfoDto? GetUserShortInfo(string username)
+    {
+        using var conn = new OracleConnection(_connectionString);
+        conn.Open();
+
+        string sql = @"
+            SELECT Name, Darkmode, Surface, FarmX, FarmY
+            FROM Users
+            WHERE Username = :username";
+
+        using var cmd = new OracleCommand(sql, conn);
+        cmd.Parameters.Add(":username", OracleDbType.Varchar2).Value = username;
+
+        try
+        {
+            using var reader = cmd.ExecuteReader();
+            if (reader.Read())
+            {
+                return new UserShortInfoDto
+                {
+                    Name = reader.GetString(0),
+                    DarkMode = reader.GetInt16(1),
+                    Surface = reader.GetInt16(2),
+                    FarmX = reader.IsDBNull(3) ? (double?)null : Convert.ToDouble(reader.GetValue(3)),
+                    FarmY = reader.IsDBNull(4) ? (double?)null : Convert.ToDouble(reader.GetValue(4))
+                };
+            }
+            else
+                return null;
+        }
+        catch (Oracle.ManagedDataAccess.Client.OracleException ex)
+        {
+            throw new Exception($"Oracle error {ex.Number}: {ex.Message}", ex);
+        }
+
+    }
+
+    public void UpdateUserSurface(string username, int surface)
+    {
+        using (var connection = new OracleConnection(_connectionString))
+        {
+            connection.Open();
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = @"
+                UPDATE USERS
+                SET SURFACE = :surface
+                WHERE USERNAME = :username";
+
+                command.Parameters.Add(new OracleParameter("surface", surface));
+                command.Parameters.Add(new OracleParameter("username", username));
+
+                int rows = command.ExecuteNonQuery();
+                if (rows == 0)
+                    throw new ArgumentException("Nie znaleziono użytkownika");
+            }
+        }
+    }
+
+    public void UpdateUserName(string username, string name)
+    {
+        using (var connection = new OracleConnection(_connectionString))
+        {
+            connection.Open();
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = @"
+                UPDATE USERS
+                SET Name = :name
+                WHERE USERNAME = :username";
+
+                command.Parameters.Add(new OracleParameter("name", name));
+                command.Parameters.Add(new OracleParameter("username", username));
+
+                int rows = command.ExecuteNonQuery();
+                if (rows == 0)
+                    throw new ArgumentException("Nie znaleziono użytkownika");
+            }
+        }
+    }
+
+    public void UpdateUserEmail(string username, string email)
+    {
+        using (var connection = new OracleConnection(_connectionString))
+        {
+            connection.Open();
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = @"
+                UPDATE USERS
+                SET Email = :email
+                WHERE USERNAME = :username";
+
+                command.Parameters.Add(new OracleParameter("email", email));
+                command.Parameters.Add(new OracleParameter("username", username));
+
+                int rows = command.ExecuteNonQuery();
+                if (rows == 0)
+                    throw new ArgumentException("Nie znaleziono użytkownika");
+            }
+        }
+    }
+
+    public void UpdateUserPhone(string username, string phone)
+    {
+        using (var connection = new OracleConnection(_connectionString))
+        {
+            connection.Open();
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = @"
+                UPDATE USERS
+                SET Telephone = :phone
+                WHERE USERNAME = :username";
+
+                command.Parameters.Add(new OracleParameter("phone", phone));
+                command.Parameters.Add(new OracleParameter("username", username));
+
+                int rows = command.ExecuteNonQuery();
+                if (rows == 0)
+                    throw new ArgumentException("Nie znaleziono użytkownika");
+            }
+        }
+    }
+
+    public void UpdateUserTheme(string username, string theme)
+    {
+        using (var connection = new OracleConnection(_connectionString))
+        {
+            connection.Open();
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = @"
+                UPDATE USERS
+                SET DARKMODE = :themeFlag
+                WHERE UPPER(USERNAME) = UPPER(:username)";
+
+                // Zamieniamy na 0/1 w bazie
+                int themeFlag = theme == "dark" ? 1 : 0;
+                command.Parameters.Add(new OracleParameter("themeFlag", themeFlag));
+                command.Parameters.Add(new OracleParameter("username", username));
+
+                int rows = command.ExecuteNonQuery();
+                if (rows == 0)
+                    throw new ArgumentException("Nie znaleziono użytkownika o nazwie: " + username);
+            }
+        }
+    }
     public void SaveFarmCoordinates(string username, double? farmX, double? farmY)
     {
         using var conn = new OracleConnection(_connectionString);
@@ -143,7 +297,7 @@ public class DatabaseService
         }
     }
 
-    public void SaveField(string username, string name, string geojson, double centerX, double centerY, double area, string complex, string type, string substrate)
+    public int SaveField(string username, string name, string geojson, double centerX, double centerY, double area, string complex, string type, string substrate)
     {
         using var conn = new OracleConnection(_connectionString);
         
@@ -166,8 +320,9 @@ public class DatabaseService
         using var cmd = conn.CreateCommand();
 
         cmd.CommandText = @"
-        INSERT INTO FIELDS (NAME, CENTERX, CENTERY, USERID, GEOJSON, AREA, SOILCOMPLEX, SOILTYPE, SOILSUBSTRATE)
-        VALUES (:name, :centerX, :centerY, :userId, :geojson, :area, :soilComplex, :soilType, :soilSubstrate)";
+            INSERT INTO FIELDS (NAME, CENTERX, CENTERY, USERID, GEOJSON, AREA, SOILCOMPLEX, SOILTYPE, SOILSUBSTRATE)
+            VALUES (:name, :centerX, :centerY, :userId, :geojson, :area, :soilComplex, :soilType, :soilSubstrate)
+            RETURNING FIELDSID INTO :newId";
 
 
         cmd.Parameters.Add(new Oracle.ManagedDataAccess.Client.OracleParameter(":name", name));
@@ -180,9 +335,18 @@ public class DatabaseService
         cmd.Parameters.Add(new Oracle.ManagedDataAccess.Client.OracleParameter(":soilType", type));
         cmd.Parameters.Add(new Oracle.ManagedDataAccess.Client.OracleParameter(":soilSubstrate", substrate));
 
+        var newIdParam = new OracleParameter(":newId", OracleDbType.Decimal)
+        {
+            Direction = ParameterDirection.Output
+        };
+        cmd.Parameters.Add(newIdParam);
+        Console.WriteLine(newIdParam.Value);
         try
         {
             cmd.ExecuteNonQuery();
+            var oracleDecimal = (OracleDecimal)newIdParam.Value;
+            int newFieldId = oracleDecimal.ToInt32();
+            return newFieldId;
         }
         catch (Oracle.ManagedDataAccess.Client.OracleException ex)
         {
@@ -272,14 +436,15 @@ public class DatabaseService
             SELECT f.FieldsId,
                    f.Name, 
                    f.CropId,
-                   p.PlantName,        -- nazwa rośliny
+                   p.PlantName,        
                    f.PlantState,
-                   g.CycleName,        -- nazwa cyklu
+                   g.CycleName,       
                    f.SowingDate,
                    f.SoilComplex,
                    f.SoilType,
                    f.SoilSubstrate,
-                   f.Area
+                   f.Area,
+                   f.Geojson
             FROM FIELDS f
             LEFT JOIN PLANTS p ON f.CropId = p.PlantId
             LEFT JOIN GROWTHCYCLES g ON f.PlantState = g.CycleId
@@ -308,7 +473,9 @@ public class DatabaseService
                     SoilComplex = reader.IsDBNull(7) ? "Nieuzupełnione" : reader.GetString(7),
                     SoilType = reader.IsDBNull(8) ? "Nieuzupełnione" : reader.GetString(8),
                     SoilSubstrate = reader.IsDBNull(9) ? "Nieuzupełnione" : reader.GetString(9),
-                    Area = reader.IsDBNull(10) ? 0.0 : reader.GetDouble(10)
+                    Area = reader.IsDBNull(10) ? 0.0 : reader.GetDouble(10),
+                    Geojson = reader.IsDBNull(11) ? "Nieuzupełnione" : reader.GetString(11),
+                    MinBbox = GeoUtils.GetBboxFromGeoJson(reader.IsDBNull(11) ? "Nieuzupełnione" : reader.GetString(11))?.ToString()
                 };
 
             }
@@ -422,10 +589,12 @@ public class DatabaseService
                            VALUES (:name, :username, :email, :passwordhash, :verificationToken)";
 
         using var cmd = new OracleCommand(sql, conn);
+
+        Console.WriteLine(request.Password);
         cmd.Parameters.Add(new OracleParameter("name", request.Name));
         cmd.Parameters.Add(new OracleParameter("username", request.Username));
         cmd.Parameters.Add(new OracleParameter("email", request.Email));
-        cmd.Parameters.Add(new OracleParameter("passwordhash", request.Password)); // UWAGA: hasło powinno być zahashowane!
+        cmd.Parameters.Add(new OracleParameter("passwordhash", _hasher.Hash(request.Password))); // UWAGA: hasło powinno być zahashowane!
         cmd.Parameters.Add(new OracleParameter("verificationToken", token));
 
         int rows = cmd.ExecuteNonQuery();
@@ -437,6 +606,7 @@ public class DatabaseService
         using (var conn = new OracleConnection(_connectionString))
         {
             conn.Open();
+            Console.WriteLine($"Verify user: {token}");
 
             // 🔹 Sprawdź, czy istnieje użytkownik z tym tokenem
             using (var checkCmd = new OracleCommand("SELECT COUNT(*) FROM Users WHERE VerificationToken = :token", conn))
@@ -668,16 +838,14 @@ public class DatabaseService
                     out_blob BLOB;
                     scan_date DATE;
                     bbox JSON;
-                    field_bbox JSON;
                 BEGIN
                     BEGIN
                         -- Pobranie najnowszego rasteru
-                        SELECT s.raster, s.scan_date, s.bbox, f.geojson
-                        INTO gr, scan_date, bbox, field_bbox
-                        FROM satellite_scans s
-                        JOIN FIELDS f ON s.FIELD_ID = f.FIELDSID
-                        WHERE s.field_id = :id
-                        ORDER BY s.scan_date DESC
+                        SELECT raster, scan_date, bbox
+                        INTO gr, scan_date, bbox
+                        FROM satellite_scans
+                        WHERE field_id = :id
+                        ORDER BY scan_date DESC
                         FETCH FIRST 1 ROWS ONLY;
 
                     EXCEPTION
@@ -685,7 +853,6 @@ public class DatabaseService
                             gr := NULL;
                             scan_date := NULL;
                             bbox := NULL;
-                            field_bbox := NULL;
                     END;
 
                     IF gr IS NOT NULL THEN
@@ -698,7 +865,6 @@ public class DatabaseService
 
                     :scanDate := scan_date;
                     :bboxInfo := bbox;
-                    :fieldBbox := field_bbox;
                 END;", conn);
 
             cmd.BindByName = true;
@@ -707,7 +873,6 @@ public class DatabaseService
             cmd.Parameters.Add("result", OracleDbType.Blob).Direction = ParameterDirection.Output;
             cmd.Parameters.Add("scanDate", OracleDbType.Date).Direction = ParameterDirection.Output;
             cmd.Parameters.Add("bboxInfo", OracleDbType.Json).Direction = ParameterDirection.Output;
-            cmd.Parameters.Add("fieldBbox", OracleDbType.Json).Direction = ParameterDirection.Output;
 
             await cmd.ExecuteNonQueryAsync();
 
@@ -718,8 +883,7 @@ public class DatabaseService
             if (oracleDate is Oracle.ManagedDataAccess.Types.OracleDate od && !od.IsNull)
                 scanDate = od.Value;
 
-            var bbox = cmd.Parameters["bboxInfo"].Value;
-            var fieldBbox = cmd.Parameters["fieldBbox"].Value;
+            var fieldBbox = cmd.Parameters["bboxInfo"].Value;
 
             if (blob == null || blob.Length == 0)
                 return null;
@@ -728,7 +892,6 @@ public class DatabaseService
             {
                 ScanDate = scanDate ?? DateTime.MinValue,
                 ImageBytes = blob.Value,
-                Bbox = bbox.ToString(),
                 FieldBbox = fieldBbox.ToString()
             };
 
@@ -736,6 +899,80 @@ public class DatabaseService
         catch (Exception ex)
         {
             throw new Exception($"Błąd w GetLatestScanAsync dla fieldId={fieldId}: {ex.Message}", ex);
+        }
+    }
+
+    public async Task<ScanResult?> GetScanByIdAsync(int scanId)
+    {
+        try
+        {
+            using var conn = new OracleConnection(_connectionString);
+            await conn.OpenAsync();
+
+            using var cmd = new OracleCommand(@"
+                DECLARE
+                    gr MDSYS.SDO_GEORASTER;
+                    out_blob BLOB;
+                    scan_date DATE;
+                    bbox JSON;
+                BEGIN
+                    BEGIN
+                        -- Pobranie najnowszego rasteru
+                        SELECT raster, scan_date, bbox
+                        INTO gr, scan_date, bbox
+                        FROM satellite_scans
+                        WHERE scan_id = :id;
+
+                    EXCEPTION
+                        WHEN NO_DATA_FOUND THEN
+                            gr := NULL;
+                            scan_date := NULL;
+                            bbox := NULL;
+                    END;
+
+                    IF gr IS NOT NULL THEN
+                        DBMS_LOB.CREATETEMPORARY(out_blob, TRUE);
+                        sdo_geor.exportTo(gr, '', 'TIFF', out_blob);
+                        :result := out_blob;
+                    ELSE
+                        :result := EMPTY_BLOB();
+                    END IF;
+
+                    :scanDate := scan_date;
+                    :bboxInfo := bbox;
+                END;", conn);
+
+            cmd.BindByName = true;
+
+            cmd.Parameters.Add("id", OracleDbType.Int32).Value = scanId;
+            cmd.Parameters.Add("result", OracleDbType.Blob).Direction = ParameterDirection.Output;
+            cmd.Parameters.Add("scanDate", OracleDbType.Date).Direction = ParameterDirection.Output;
+            cmd.Parameters.Add("bboxInfo", OracleDbType.Json).Direction = ParameterDirection.Output;
+            await cmd.ExecuteNonQueryAsync();
+
+            var blob = (OracleBlob)cmd.Parameters["result"].Value;
+            var oracleDate = cmd.Parameters["scanDate"].Value;
+            DateTime? scanDate = null;
+
+            if (oracleDate is Oracle.ManagedDataAccess.Types.OracleDate od && !od.IsNull)
+                scanDate = od.Value;
+
+            var fieldBbox = cmd.Parameters["bboxInfo"].Value;
+
+            if (blob == null || blob.Length == 0)
+                return null;
+
+            return new ScanResult
+            {
+                ScanDate = scanDate ?? DateTime.MinValue,
+                ImageBytes = blob.Value,
+                FieldBbox = fieldBbox.ToString()
+            };
+
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Błąd w GetLatestScanAsync dla scanId={scanId}: {ex.Message}", ex);
         }
     }
 
@@ -812,6 +1049,74 @@ public class DatabaseService
         }
 
         return plants;
+    }
+    public async Task<List<ThresholdDto>> GetThresholdsAsync()
+    {
+        var thresholds = new List<ThresholdDto>();
+
+        using (var conn = new OracleConnection(_connectionString))
+        {
+            await conn.OpenAsync();
+
+            var query = "SELECT cycleId, minndvi, maxndvi FROM growthcycles";
+
+            using (var cmd = new OracleCommand(query, conn))
+            using (var reader = await cmd.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    thresholds.Add(new ThresholdDto
+                    {
+                        CycleId = Convert.ToInt32(reader["cycleId"]),
+                        MinNdvi = Convert.ToDouble(reader["minNdvi"]),
+                        MaxNdvi = Convert.ToDouble(reader["maxNdvi"])
+                    });
+                }
+            }
+        }
+
+        Console.WriteLine(thresholds.Count);
+        return thresholds;
+    }
+    public bool DeleteUserAccount(string username, string password)
+    {
+        using var conn = new OracleConnection(_connectionString);
+        conn.Open();
+
+        using var trans = conn.BeginTransaction();
+        try
+        {
+            // 1️⃣ Weryfikacja hasła użytkownika
+            using var checkCmd = new OracleCommand(
+                "SELECT COUNT(*) FROM users WHERE username = :username AND passwordhash = :password",
+                conn
+            );
+            checkCmd.Parameters.Add(new OracleParameter("username", username));
+            checkCmd.Parameters.Add(new OracleParameter("password", password)); // później zastąp hash
+
+            var result = Convert.ToInt32(checkCmd.ExecuteScalar());
+            if (result == 0)
+            {
+                trans.Rollback();
+                return false; // hasło niepoprawne
+            }
+
+            // 2️⃣ Usuwanie użytkownika (kaskadowe dla wszystkich powiązanych tabel)
+            using var deleteCmd = new OracleCommand(
+                "DELETE FROM users WHERE username = :username",
+                conn
+            );
+            deleteCmd.Parameters.Add(new OracleParameter("username", username));
+            deleteCmd.ExecuteNonQuery();
+
+            trans.Commit();
+            return true; // konto usunięte
+        }
+        catch
+        {
+            trans.Rollback();
+            throw;
+        }
     }
 }
 

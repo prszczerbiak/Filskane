@@ -33,9 +33,11 @@ namespace WebApplication1.Analysis
            var nClasses = _model.NumberOfClasses;
 
             if (nClasses == 3)
-                _model.Priors = [ 0.3, 0.5, 0.2 ];
+                _model.Priors = [0.3, 0.5, 0.2];
+            else if (nClasses == 2)
+                _model.Priors = [0.4, 0.6];
             else
-                _model.Priors = [0.4,0.6];
+                _model.Priors = [1.0];
         }
 
         /// <summary>

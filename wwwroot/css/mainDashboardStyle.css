@@ -142,3 +142,31 @@ footer {
         background-color: #28a745;
         color: white;
     }
+
+.dark-theme body {
+    background-color: #202123; /* ciemne tło strony */
+    color: #e5e5e5; /* tekst w nagłówkach i body */
+}
+
+.dark-theme #welcome {
+    color: #ffffff; /* nagłówek jasny */
+}
+
+.dark-theme .content {
+    background-color: #2a2b2e;
+}
+
+.dark-theme #logoutBtn {
+    background-color: #3a3a3d; /* taki sam kolor jak pola tekstowe */
+    color: #ffffff; /* tekst biały */
+    /*border: 2px solid #555;*/ /* opcjonalnie delikatna ramka kontrastująca */
+}
+
+    .dark-theme #logoutBtn:hover {
+        background-color: #505050; /* lekko jaśniejszy przy hoverze */
+        color: #ffffff;
+    }
+
+.dark-theme .tile {
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.2); /* delikatny, jasny cień */
+}

@@ -2,6 +2,35 @@
 // ZMIENNE GLOBALNE
 // ============================================================
 const token = localStorage.getItem("token");
+if (!token) {
+    handleUnauthorized();
+    throw new Error("Brak tokena – zatrzymano dalsze wykonywanie skryptu");
+}
+
+const savedTheme = localStorage.getItem('theme') || 'light';
+if (savedTheme === 'dark') {
+    document.documentElement.classList.add('dark-theme');
+}
+
+function handleUnauthorized() {
+    alert("Twoja sesja wygasła. Zaloguj się ponownie.");
+    localStorage.removeItem("token"); // usuń stary token
+    window.location.href = "index.html"; // przekierowanie do strony logowania
+}
+
+// Interceptor dla fetch, żeby złapać 401
+const originalFetch = window.fetch;
+window.fetch = async (...args) => {
+    const response = await originalFetch(...args);
+    if (response.status === 401) {
+        handleUnauthorized(); // pokaz alert i wróć do logowania
+        throw new Error("Unauthorized");
+    }
+    return response;
+};
+
+// Sprawdzenie od razu przy ładowaniu strony
+
 
 let map = L.map('map').setView([50.800667, 19.124278], 13);
 let selectMap, addFieldMap;
@@ -280,16 +309,15 @@ document.getElementById('namedFieldBtn').addEventListener('click', () => {
         })
         .then(data => {
             alert("Pole zapisane poprawnie!");
+            const geojsonObj = JSON.parse(JSON.stringify(geojson));
+            const newLayer = L.geoJSON(geojsonObj, { style: { color: '#008000', weight: 2, fillOpacity: 0.3 } });
+            createFieldLayer(newLayer, fieldName, data.fieldId);
             document.getElementById('nameFieldModal').style.display = 'none';
         })
         .catch(err => {
             console.error(err);
             alert("Wystąpił problem przy zapisie pola.");
         });
-
-    const geojsonObj = JSON.parse(JSON.stringify(geojson));
-    const newLayer = L.geoJSON(geojsonObj, { style: { color: '#008000', weight: 2, fillOpacity: 0.3 } });
-    createFieldLayer(newLayer, fieldName);
 
     document.getElementById('nameFieldModal').style.display = 'none';
 });
@@ -401,6 +429,7 @@ document.getElementById('confirmDeleteFieldBtn').addEventListener("click", () =>
             document.getElementById('deleteFieldModal').style.display = "none";
             selectedFieldId = null;
             selectedLayer = null;
+            location.reload();
         })
         .catch(err => {
             console.error(err);
@@ -468,7 +497,11 @@ function createFieldLayer(layer, fieldName, fieldId = null) {
         const deleteBtn = popupEl.querySelector("#deleteFieldBtn");
 
         if (infoBtn) infoBtn.onclick = () => {
-            alert(`Szczegóły pola: ${fieldName}`);
+            if (!fieldId) {
+                alert("Brak ID pola – nie można przejść do szczegółów.");
+                return;
+            }
+            window.location.href = `/fieldDashboard.html?fieldId=${fieldId}`;
         };
 
         if (deleteBtn) deleteBtn.onclick = () => {

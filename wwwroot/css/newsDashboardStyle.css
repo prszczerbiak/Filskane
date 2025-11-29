@@ -1,0 +1,212 @@
+﻿body {
+    font-family: Arial, sans-serif;
+    background-color: #f8f8f8;
+    text-align: center;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%; /* Upewnij się, że body i html mają wysokość 100% */
+}
+
+.content {
+    border: 5px solid green;
+    width: calc(100% - 100px);
+    min-height: calc(100vh - 120px);
+    padding: 20px 40px;
+    box-sizing: border-box;
+    background-color: white;
+    border-radius: 15px;
+    margin: 20px 50px;
+    display: flex;
+    flex-direction: column; /* nagłówek na górze, kafelki pod spodem */
+    /* usuwamy align-items i justify-content! */
+}
+
+
+footer {
+    background-color: green; /* Zielone tło */
+    color: white; /* Biały tekst */
+    text-align: center; /* Wyśrodkowanie tekstu */
+    padding: 15px; /* Wewnętrzny odstęp */
+    /*position: fixed; /* Przyklejenie stopki do dołu */
+    bottom: 0;
+    left: 0; /* Przypięcie do lewej strony */
+    width: 100%; /* Pełna szerokość ekranu */
+    box-sizing: border-box; /* Zapobiega przesunięciom przez padding */
+}
+
+.dark-theme body {
+    background-color: #202123; /* ciemne tło strony */
+    color: #e5e5e5; /* tekst w nagłówkach i body */
+}
+
+.dark-theme .content {
+    background-color: #2a2b2e;
+}
+
+#weather-widget {
+/*    background: var(--bg, #f5f5f5);*/
+    padding: 15px 0;
+    border-radius: 12px;
+/*    box-shadow: 0 0 10px rgba(0,0,0,0.1);*/
+}
+
+.dark-theme #weather-widget {
+    --bg: #222;
+    color: white;
+}
+
+/* Kontener paska pogodowego – poziomy scroll */
+#weather-hours {
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding: 10px 0;
+    scroll-behavior: smooth;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.weather-hour {
+    flex: 0 0 auto;
+    min-width: 100px;
+    min-height: 120px;
+    background: #f3f3f3;
+    padding: 16px 12px;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border: 4px solid #4CAF50; /* zielone obramowanie */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* opcjonalnie cień */
+    justify-content: center;
+}
+
+.dark-theme .weather-hour {
+    background: #2a2a2a;
+    color: white;
+}
+
+.dark-theme .weather-hour {
+    background: #2a2a2a;
+    color: white;
+}
+
+.weather-hour img {
+    width: 32px;
+    height: 32px;
+}
+
+.weather-header {
+    border: 4px solid #4CAF50; /* zielone obramowanie */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* opcjonalnie cień */
+    border-radius: 10px;
+}
+
+.weather-header h3{
+    margin:10px;
+}
+
+.weather-hour i {
+    font-size: 36px; /* ikony większe */
+}
+
+.see-more-container {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.btn-see-more {
+    padding: 10px 20px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+    .btn-see-more:hover {
+        background-color: #45a049;
+    }
+
+/* Sekcja informacyjna pod pogodą */
+.info-section {
+    display: flex;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+/* Lewa kolumna: aktualności */
+.news-section {
+    flex: 1; /* zajmuje połowę szerokości */
+    background-color: #f3f3f3;
+    padding: 15px;
+    border-radius: 10px;
+}
+
+/* Prawa kolumna: kalendarz + ceny */
+.right-section {
+    flex: 1;
+    display: flex;
+    gap: 15px;
+}
+
+/* Lewa część prawej kolumny */
+.calendar-section {
+    flex: 1;
+    background-color: #fef3c7;
+    padding: 15px;
+    border-radius: 10px;
+}
+
+/* Prawa część prawej kolumny */
+.prices-section {
+    flex: 1;
+    background-color: #d1fae5;
+    padding: 15px;
+    border-radius: 10px;
+}
+
+/* Responsywność */
+@media (max-width: 800px) {
+    .info-section, .right-section {
+        flex-direction: column;
+    }
+}
+
+.dark-theme .news-section {
+    background-color: #383a3f; /* ciemniejszy szary, kontrastujący z tłem */
+    color: #e5e5e5; /* jasny tekst */
+}
+
+.dark-theme .calendar-section {
+    background-color: #3c3a2f; /* ciemny odcień żółtego */
+    color: #fef3c7; /* jasnożółty tekst */
+}
+
+.dark-theme .prices-section {
+    background-color: #215a4b; /* ciemny odcień zieleni */
+    color: #d1fae5; /* jasna zieleń tekst */
+}
+
+.dark-theme #weather-hours::-webkit-scrollbar-thumb {
+    background-color: #555; /* ciemniejszy uchwyt */
+    border: 2px solid #2a2b2e; /* dopasowanie do tła */
+    border-radius: 5px;
+}
+
+.dark-theme #weather-hours::-webkit-scrollbar-track {
+    background: #2a2b2e; /* ciemne tło toru */
+}
+
+/* Firefox – tylko w trybie ciemnym */
+.dark-theme #weather-hours {
+    scrollbar-color: #555 #2a2b2e;
+}

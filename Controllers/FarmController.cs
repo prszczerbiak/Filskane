@@ -243,8 +243,8 @@ public class FarmController : ControllerBase
         try
         {
 
-            _dbService.SaveField(username, dto.Name, dto.Geojson, dto.CenterX, dto.CenterY, dto.Area, complex, type, substrate);
-            return Ok(new { message = "Pole zapisane poprawnie." });
+            int fieldId = _dbService.SaveField(username, dto.Name, dto.Geojson, dto.CenterX, dto.CenterY, dto.Area, complex, type, substrate);
+            return Ok(new { fieldId });
         }
         catch (Exception ex)
         {

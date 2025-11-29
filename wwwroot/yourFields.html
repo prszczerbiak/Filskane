@@ -20,6 +20,34 @@
     </footer>
 
     <script>
+
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        if (savedTheme === 'dark') {
+            document.documentElement.classList.add('dark-theme');
+        }
+        function handleUnauthorized() {
+            alert("Twoja sesja wygasła. Zaloguj się ponownie.");
+            localStorage.removeItem("token"); // usuń stary token
+            window.location.href = "index.html"; // przekierowanie do strony logowania
+        }
+
+        // Interceptor dla fetch, żeby złapać 401
+        const originalFetch = window.fetch;
+        window.fetch = async (...args) => {
+            const response = await originalFetch(...args);
+            if (response.status === 401) {
+                handleUnauthorized(); // pokaz alert i wróć do logowania
+                throw new Error("Unauthorized");
+            }
+            return response;
+        };
+
+        // Sprawdzenie od razu przy ładowaniu strony
+        const token = localStorage.getItem("token");
+        if (!token) {
+            handleUnauthorized();
+        }
+
         async function loadFields() {
             try {
                 const response = await fetch('/api/fieldsList', {

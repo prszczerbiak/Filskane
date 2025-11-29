@@ -85,8 +85,8 @@ html, body {
     margin-top: 5px;
     margin-bottom: 15px;
     box-sizing: border-box;
-    border: 1px solid #ccc;
-    border-radius: 5px;
+    border: 2px solid #ccc;
+    border-radius: 7px;
 }
 
 .input-with-icon {
@@ -122,4 +122,206 @@ footer {
     left: 0; /* Przypięcie do lewej strony */
     width: 100%; /* Pełna szerokość ekranu */
     box-sizing: border-box; /* Zapobiega przesunięciom przez padding */
+}
+.unit-switch {
+    display: flex;
+    position: relative;
+    background: #f0f0f0;
+    border-radius: 20px;
+    overflow: hidden;
+    width: 200px;
+    cursor: pointer;
+    justify-content: center;
+    margin: 20px auto;
+}
+
+.switch-option {
+    flex: 1;
+    text-align: center;
+    padding: 8px 0;
+    z-index: 2;
+    transition: color 0.2s ease;
+}
+
+    .switch-option.active {
+        color: #fff;
+    }
+
+.switch-highlight {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: calc(100% / 3);
+    background: #007bff;
+    border-radius: 20px;
+    transition: left 0.3s ease;
+    z-index: 1;
+}
+
+.theme-switch {
+    display: flex;
+    position: relative;
+    background: #f0f0f0;
+    border-radius: 20px;
+    overflow: hidden;
+    width: 120px;
+    cursor: pointer;
+    justify-content: center;
+    margin: 10px auto;
+    font-size: 1.3em;
+}
+
+.theme-option {
+    flex: 1;
+    text-align: center;
+    padding: 8px 0;
+    z-index: 2;
+    transition: color 0.2s ease;
+}
+
+    .theme-option.active {
+        color: #fff;
+    }
+
+.theme-highlight {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 50%;
+    background: #007bff;
+    border-radius: 20px;
+    transition: left 0.3s ease;
+    z-index: 1;
+}
+
+.modal {
+    display: none; /* domyślnie ukryty */
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: #fff;
+    margin: 10% auto;
+    padding: 20px;
+    border-radius: 10px;
+    width: 400px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.btn-close {
+    background-color: #e74c3c; /* czerwony */
+    color: white;
+}
+
+.btn-save {
+    background: #28a745;
+    color: #fff;
+}
+
+.dark-theme body {
+    background-color: #202123; /* szare tło całej strony */
+    color: #e5e5e5; /* jasny tekst */
+}
+
+.dark-theme .content {
+    background-color: #2a2b2e; /* ciemniejsze tło kontenera (GPT-style) */
+    color: #e5e5e5; /* jasny tekst wewnątrz contentu */
+}
+
+.dark-theme .menu {
+    background-color: #2a2b2e; /* tło menu bocznego */
+    border-right: 1px solid #444; /* ciemniejsza linia separatora */
+}
+
+    .dark-theme .menu-option {
+        background-color: #2a2b2e;
+        color: #e5e5e5;  jasny tekst w menu 
+    }
+
+        .dark-theme .menu-option:hover {
+            background-color: green;
+            color: white;
+            transform: scale(1.05);
+        }
+
+        .dark-theme .menu-option.active {
+            background-color: green; /* wygląd jak po hover */
+            color: white;
+            transform: scale(1.05);
+        }
+
+.dark-theme .description {
+    color: #e5e5e5; /* tekst w opisach/formularzach */
+}
+
+.dark-theme input {
+    background-color: #3a3b3f; /* ciemne pole tekstowe */
+    color: #ffffff;
+    border: 2px solid #555;
+}
+
+/* DARK MODE SWITCHES */
+.dark-theme .unit-switch,
+.dark-theme .theme-switch {
+    background-color: #3a3a3d; /* ciemne tło całego switcha */
+}
+
+.dark-theme .switch-option,
+.dark-theme .theme-option {
+    background-color: transparent; /* przezroczyste, żeby było widać highlight */
+    color: #ccc; /* tekst nieaktywny */
+    z-index: 2;
+}
+
+    .dark-theme .switch-option.active,
+    .dark-theme .theme-option.active {
+        color: #ffffff; /* aktywny tekst na highlight */
+    }
+
+.dark-theme .switch-highlight,
+.dark-theme .theme-highlight {
+    background-color: #505050; /* jasny szary highlight */
+    z-index: 1;
+    border-radius: 20px;
+}
+
+.modal-footer {
+    text-align: center;
+    margin: 20px 0;
+}
+
+    .modal-footer button {
+        padding: 8px 15px;
+        margin-left: 10px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+form label {
+    display: block;
+    margin: 10px 0 5px;
+}
+
+form input {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 15px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    box-sizing: border-box;
+}
+
+.dark-theme .modal-content {
+    background-color: #202123;
 }

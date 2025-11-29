@@ -15,10 +15,21 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // Odczytaj connection string i dodaj do DI
-builder.Services.AddSingleton(new DatabaseService(builder.Configuration.GetConnectionString("OracleDb"),builder.Configuration.GetConnectionString("GdalOracle")));
+builder.Services.AddSingleton<IPasswordHasherService, Argon2PasswordHasherService>();
+builder.Services.AddSingleton<DatabaseService>(sp =>
+{
+    var configuration = sp.GetRequiredService<IConfiguration>();
+    var hasher = sp.GetRequiredService<IPasswordHasherService>();
+
+    var oracleDbConn = configuration.GetConnectionString("OracleDb");
+    var gdalOracleConn = configuration.GetConnectionString("GdalOracle");
+
+    return new DatabaseService(oracleDbConn, gdalOracleConn, hasher);
+});
 builder.Services.AddSingleton<EmailService>();
 builder.Services.AddHttpClient<SentinelHubService>();
-builder.Services.AddTransient<CropThresholdProvider>();
+builder.Services.AddHostedService<ThresholdService>();
+builder.Services.AddSingleton<ThresholdStore>();
 builder.Services.AddTransient<NdviAnalysisService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

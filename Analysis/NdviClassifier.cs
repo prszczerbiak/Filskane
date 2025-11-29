@@ -1,26 +1,29 @@
-﻿namespace WebApplication1.Analysis
+﻿using WebApplication1.Services;
+namespace WebApplication1.Analysis
 {
     public class NdviClassifier
     {
-        private readonly CropThresholdProvider _thresholds;
+        private readonly ThresholdStore _threshold;
 
-        public NdviClassifier(CropThresholdProvider thresholds)
+        public NdviClassifier(ThresholdStore threshold)
         {
-            _thresholds = thresholds;
+            _threshold = threshold;
         }
 
         /// <summary>
         /// Klasyfikuje każdy piksel NDVI do jednej z trzech klas: 
         /// 0 - bardzo dobry, 1 - średni, 2 - zagrożony
         /// </summary>
-        public int[] Classify(double[][] input, double[,] ndvi, string cropType, DateTime sowingDate)
+        public int[] Classify(double[][] input, double[,] ndvi, int cycleId)
         {
             int height = ndvi.GetLength(0);
             int width = ndvi.GetLength(1);
             int[] labels = new int[input.Length];
 
             // Pobierz dynamiczne progi dla tej rośliny
-            var (good, medium) = _thresholds.GetThresholds(cropType, sowingDate, DateTime.Now);
+            var (medium, good) = _threshold.GetThreshold(cycleId);
+
+            Console.WriteLine(medium.ToString(), good.ToString());
 
             //for (int y = 0; y < height; y++)
             //{

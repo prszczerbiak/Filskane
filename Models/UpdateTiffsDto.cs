@@ -5,5 +5,7 @@
         public DateTime Date { get; set; }
 
         public IFormFile? Zip {  get; set; }
+
+        public string? Geojson { get; set; }
     }
 }

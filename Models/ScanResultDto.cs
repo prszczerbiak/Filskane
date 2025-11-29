@@ -16,8 +16,6 @@ namespace WebApplication1.Models
         public DateTime ScanDate { get; set; }
         public byte[] ImageBytes { get; set; } = Array.Empty<byte>();
 
-        public string? Bbox { get; set; }
-
         public string? FieldBbox { get; set; }
 
         public static byte[] ConvertTiffBytesToRgbPng(byte[] tiffBytes)
@@ -98,7 +96,7 @@ namespace WebApplication1.Models
             return ms.ToArray();
         }
 
-        //public static byte[] ConvertTiffToNdviHeatmap(byte[] tiffBytes)
+        //public static void ConvertTiffToNdviHeatmap(byte[] tiffBytes)
         //{
         //    using var inputStream = new MemoryStream(tiffBytes);
         //    using var tiff = Tiff.ClientOpen("in-memory", "r", inputStream, new TiffStream());
@@ -145,8 +143,7 @@ namespace WebApplication1.Models
         //    ScottPlot.Plot plot = new();
         //    PixelPadding padding = new(-22, -22, -34, -34);
         //    plot.Layout.Fixed(padding);
-        //    //plot.Layout.Fixed(new ScottPlot.PixelPadding(left: 0, right: 100, top: 0, bottom: 0));
-        //    var hm = plot.Add.Heatmap(ndvi); // Turbo -> dobra paleta od niebieskiego do zielonego
+        //    var hm = plot.Add.Heatmap(ndvi);
         //    plot.Grid.IsVisible = false;
         //    plot.Axes.Bottom.IsVisible = false;
         //    plot.Axes.Left.IsVisible = false;
@@ -154,20 +151,46 @@ namespace WebApplication1.Models
         //    plot.Axes.Top.IsVisible = false;
         //    hm.Colormap = new ScottPlot.Colormaps.Greens().Reversed();
         //    hm.ManualRange = new ScottPlot.Range(0, 1);
+
+        //    // Tworzenie legendy z ciemnym tłem #2a2b2e
         //    ScottPlot.Plot hlp = new();
+
+        //    // Ustawienie ciemnego tła dla całego plotu legendy
+        //    hlp.FigureBackground.Color = ScottPlot.Color.FromHex("#2a2b2e");
+        //    hlp.DataBackground.Color = ScottPlot.Color.FromHex("#2a2b2e");
+
         //    hlp.Layout.Fixed(new ScottPlot.PixelPadding(left: 5, right: 5, top: 0, bottom: 500));
         //    var cb = hlp.Add.ColorBar(hm, Edge.Bottom);
 
+        //    // Konfiguracja colorbar z białymi oznaczeniami
         //    hlp.Grid.IsVisible = false;
         //    hlp.Axes.Bottom.IsVisible = false;
         //    hlp.Axes.Left.IsVisible = false;
         //    hlp.Axes.Right.IsVisible = false;
         //    hlp.Axes.Top.IsVisible = false;
+
         //    cb.Width = 30;
 
-        //    hlp.SavePng("colorbar.png", (width) * 8, 100);
-        //    return plot.GetImageBytes((width) * 6, (height) * 6, ScottPlot.ImageFormat.Png);
+        //    // Poprawne ustawienia dla ScottPlot 5.1.57
+        //    var whiteColor = ScottPlot.Colors.White;
 
+        //    // Ustawienie białego koloru dla tick labels
+        //    cb.Axis.TickLabelStyle.ForeColor = whiteColor;
+        //    hlp.Axes.Bottom.TickLabelStyle.ForeColor = whiteColor;
+
+        //    // Ustawienie białego koloru dla tick marks
+        //    cb.Axis.MajorTickStyle.Color = whiteColor;
+        //    cb.Axis.MinorTickStyle.Color = whiteColor;
+        //    hlp.Axes.Bottom.MajorTickStyle.Color = whiteColor;
+        //    hlp.Axes.Bottom.MinorTickStyle.Color = whiteColor;
+
+        //    // Ustawienie białego koloru dla ramki
+        //    cb.Axis.FrameLineStyle.Color = whiteColor;
+        //    hlp.Axes.Bottom.FrameLineStyle.Color = whiteColor;
+
+        //    // Zapis legendy z ciemnym tłem
+        //    hlp.SavePng("colorbarDark.png", (width) * 8, 100);
+        //    return;
         //}
 
         public static double[,] CalculateNdvi(byte[] tiffBytes)

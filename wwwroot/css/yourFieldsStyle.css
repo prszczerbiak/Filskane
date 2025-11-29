@@ -128,3 +128,13 @@ footer {
     .field-tile:hover {
         transform: scale(1.05);
     }
+
+.dark-theme body {
+    background-color: #202123; /* szare tło całej strony */
+    color: #e5e5e5; /* jasny tekst */
+}
+
+.dark-theme .content {
+    background-color: #2a2b2e; /* ciemniejsze tło kontenera (GPT-style) */
+    color: #e5e5e5; /* jasny tekst wewnątrz contentu */
+}

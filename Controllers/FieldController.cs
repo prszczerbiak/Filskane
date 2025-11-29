@@ -73,8 +73,8 @@ public class FieldController : ControllerBase
         return Ok(cycle);
     }
 
-    [HttpGet("latestScan/{fieldId}")]
-    public async Task<IActionResult> GetLatestScan(int fieldId)
+    [HttpPost("latestScan/{fieldId}")]
+    public async Task<IActionResult> GetLatestScan(int fieldId, [FromBody] ScanRequestDto request)
     {
         var username = User.Identity?.Name;
         if (string.IsNullOrEmpty(username))
@@ -94,7 +94,40 @@ public class FieldController : ControllerBase
             Response.Headers.Append("X-Scan-Date", result.ScanDate.ToString("yyyy-MM-dd"));
 
             // 🖼️ Zwróć PNG jako strumień binarny
-            return File(ImageUtils.DrawGeoJsonPolygonOnImage(ScanResult.ConvertTiffBytesToRgbPng(result.ImageBytes),result.FieldBbox,result.Bbox, false), "image/png");
+            return File(ImageUtils.DrawGeoJsonPolygonOnImage(ScanResult.ConvertTiffBytesToRgbPng(result.ImageBytes), request.Geojson, result.FieldBbox, false), "image/png");
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpPost("imageById/{scanId}")]
+    public async Task<IActionResult> GetScanById(int scanId, [FromBody] ScanRequestDto request)
+    {
+        
+        var username = User.Identity?.Name;
+        if (string.IsNullOrEmpty(username))
+            return Unauthorized("Brak użytkownika w tokenie");
+
+        try
+        {
+            // 🔹 Pobierz konkretny skan po ID
+            var result = await _db.GetScanByIdAsync(scanId);
+            if (result == null || result.ImageBytes == null)
+            {
+                Response.Headers.Append("X-Scan-Date", "Brak danych");
+                return NoContent();
+            }
+
+            // 📅 Dodaj datę skanu do nagłówka
+            Response.Headers.Append("X-Scan-Date", result.ScanDate.ToString("yyyy-MM-dd"));
+
+            // 🖼️ Zwróć PNG z naniesionym polygonem pola
+            var rgbImage = ScanResult.ConvertTiffBytesToRgbPng(result.ImageBytes);
+            var visualizedImage = ImageUtils.DrawGeoJsonPolygonOnImage(rgbImage, request.Geojson, result.FieldBbox, false);
+            
+            return File(visualizedImage, "image/png");
         }
         catch (Exception ex)
         {
@@ -212,20 +245,20 @@ public class FieldController : ControllerBase
             double[] gt = new double[6];
             outDs.GetGeoTransform(gt);
 
-            double minX = gt[0];
-            double maxY = gt[3];
-            double maxX = minX + gt[1] * outDs.RasterXSize + gt[2] * outDs.RasterYSize;
-            double minY = maxY + gt[4] * outDs.RasterXSize + gt[5] * outDs.RasterYSize;
-
-            var bboxObj = new
+            var bboxObj = new Bbox
             {
-                minX,
-                minY,
-                maxX,
-                maxY
+                MinX = gt[0],
+                MaxY = gt[3],
+                MaxX = gt[0] + gt[1] * outDs.RasterXSize + gt[2] * outDs.RasterYSize,
+                MinY = gt[3] + gt[4] * outDs.RasterXSize + gt[5] * outDs.RasterYSize,
             };
             string bboxJson = JsonSerializer.Serialize(bboxObj);
 
+            bool isWithin = GeoUtils.IsFieldWithinRaster(bboxJson, data.Geojson);
+            if (!isWithin)
+            {
+                return BadRequest("Pole nie mieści się w zasięgu zdjęcia — nie można zaimportować skanu.");
+            }
 
             // 5️⃣ Pobranie z /vsimem/ jako byte[]
             long size;
@@ -266,8 +299,40 @@ public class FieldController : ControllerBase
         }
     }
 
-    [HttpGet("latestNDVI/{fieldId}")]
-    public async Task<IActionResult> GetLatestNDVI(int fieldId)
+    //[HttpGet("latestNDVI/{fieldId}")]
+    //public async Task<IActionResult> GetLatestNDVI(int fieldId)
+    //{
+    //    var username = User.Identity?.Name;
+    //    if (string.IsNullOrEmpty(username))
+    //        return Unauthorized("Brak użytkownika w tokenie");
+
+    //    try
+    //    {
+    //        var result = await _db.GetLatestScanAsync(fieldId);
+
+    //        if (result == null || result.ImageBytes == null)
+    //        {
+    //            Response.Headers.Append("X-Scan-Date", "Brak danych");
+    //            return NoContent();
+
+    //        }
+    //        // 📅 Dodaj datę do nagłówka
+    //        Response.Headers.Append("X-Scan-Date", result.ScanDate.ToString("yyyy-MM-dd"));
+
+
+    //        // 🖼️ Zwróć PNG jako strumień binarny
+    //        //byte[] ndvi = ImageUtils.DrawGeoJsonPolygonOnImage(ScanResult.ConvertTiffToNdviHeatmap(result.ImageBytes, result.FieldBbox), result.FieldBbox, result.Bbox, true);
+    //        return File(ImageUtils.DrawGeoJsonPolygonOnImage(ScanResult.RenderNdviHeatmap(ScanResult.CalculateNdvi(result.ImageBytes)), result.FieldBbox, result.Bbox, true),"image/png");
+
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        return BadRequest(new { error = ex.Message });
+    //    }
+    //}
+
+    [HttpGet("latestNDVIData/{fieldId}")]
+    public async Task<IActionResult> GetLatestNDVIData(int fieldId)
     {
         var username = User.Identity?.Name;
         if (string.IsNullOrEmpty(username))
@@ -276,21 +341,84 @@ public class FieldController : ControllerBase
         try
         {
             var result = await _db.GetLatestScanAsync(fieldId);
-
             if (result == null || result.ImageBytes == null)
             {
                 Response.Headers.Append("X-Scan-Date", "Brak danych");
                 return NoContent();
-
             }
-            // 📅 Dodaj datę do nagłówka
+
             Response.Headers.Append("X-Scan-Date", result.ScanDate.ToString("yyyy-MM-dd"));
 
+            // 🔹 Liczymy NDVI (float[,] lub double[,])
+            var ndvi = ScanResult.CalculateNdvi(result.ImageBytes);
 
-            // 🖼️ Zwróć PNG jako strumień binarny
-            //byte[] ndvi = ImageUtils.DrawGeoJsonPolygonOnImage(ScanResult.ConvertTiffToNdviHeatmap(result.ImageBytes, result.FieldBbox), result.FieldBbox, result.Bbox, true);
-            return File(ImageUtils.DrawGeoJsonPolygonOnImage(ScanResult.RenderNdviHeatmap(ScanResult.CalculateNdvi(result.ImageBytes)), result.FieldBbox, result.Bbox, true),"image/png");
+            var ndviList = ImageUtils.ConvertToNestedList(ndvi);
 
+            return Ok(new NdviDataDto
+            {
+                FieldBbox = result.FieldBbox,
+                Ndvi = ndviList
+            });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpGet("NDVIDataById/{scanId}")]
+    public async Task<IActionResult> GetNDVIDataById(int scanId)
+    {
+        var username = User.Identity?.Name;
+        if (string.IsNullOrEmpty(username))
+            return Unauthorized("Brak użytkownika w tokenie");
+
+        try
+        {
+            var result = await _db.GetScanByIdAsync(scanId);
+            if (result == null || result.ImageBytes == null)
+            {
+                Response.Headers.Append("X-Scan-Date", "Brak danych");
+                return NoContent();
+            }
+
+            Response.Headers.Append("X-Scan-Date", result.ScanDate.ToString("yyyy-MM-dd"));
+
+            // 🔹 Liczymy NDVI (float[,] lub double[,])
+            var ndvi = ScanResult.CalculateNdvi(result.ImageBytes);
+
+            var ndviList = ImageUtils.ConvertToNestedList(ndvi);
+
+            return Ok(new NdviDataDto
+            {
+                FieldBbox = result.FieldBbox,
+                Ndvi = ndviList
+            });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpPost("visualize")]
+    public IActionResult VisualizeNDVI([FromBody] NdviVisualizationDto request)
+    {
+        try
+        {
+            if (request.NdviMatrix == null || request.NdviMatrix.Count == 0)
+                return BadRequest("Brak danych NDVI");
+
+            var ndviArray = ImageUtils.ConvertFromNestedList(request.NdviMatrix);
+
+            // 🔹 Generujemy heatmapę
+            var ndviMap = ScanResult.RenderNdviHeatmap(ndviArray);
+
+            // 🔹 Można opcjonalnie narysować granice pola
+            if (request.FieldBbox != null && request.Bbox != null)
+                ndviMap = ImageUtils.DrawGeoJsonPolygonOnImage(ndviMap, request.FieldBbox, request.Bbox, true);
+
+            return File(ndviMap, "image/png");
         }
         catch (Exception ex)
         {
@@ -304,28 +432,28 @@ public class FieldController : ControllerBase
         if (request == null)
             return BadRequest("Brak danych wejściowych.");
 
-        if (string.IsNullOrEmpty(request.CropType) || request.SowingDate == DateTime.MinValue)
-            return BadRequest("Niepoprawne dane rośliny lub daty zasiewu.");
+        if (request.CycleId == 0)
+            return BadRequest("Niepoprawne dane cyklu rośliny");
 
-        // 1️⃣ Pobierz najnowszy skan NDVI dla pola
-        var result = await _db.GetLatestScanAsync(fieldId);
-        if (result == null)
-            return NotFound($"Brak skanu dla pola {fieldId}");
 
         // 2️⃣ Wygeneruj klasy ryzyka
-        var overlay = _analysisService.GroupByRisk(request, result.ImageBytes, result.FieldBbox, result.Bbox);
+        var groupResult = _analysisService.GroupByRisk(request);
 
         // 3️⃣ Wyrenderuj mapę NDVI w formie heatmapy
-        var ndviMap = ScanResult.RenderNdviHeatmap(ScanResult.CalculateNdvi(result.ImageBytes));
+        var ndviMap = ScanResult.RenderNdviHeatmap(ImageUtils.ConvertFromNestedList(request.Ndvi));
 
         // 4️⃣ Nałóż półprzezroczystą mapę ryzyka
-        var withOverlay = ImageUtils.ApplyRiskOverlay(ndviMap, overlay);
+        var withOverlay = ImageUtils.ApplyRiskOverlay(ndviMap, groupResult.Overlay);
 
         // 5️⃣ Dorysuj granice pola z GeoJSON
-        var finalImage = ImageUtils.DrawGeoJsonPolygonOnImage(withOverlay, result.FieldBbox, result.Bbox, true);
+        var finalImage = ImageUtils.DrawGeoJsonPolygonOnImage(withOverlay, request.FieldGeojson, request.ImageBbox, true);
 
         // 6️⃣ Zwróć obraz jako PNG
-        return File(finalImage, "image/png");
+        return Ok(new
+        {
+            mainImage = Convert.ToBase64String(finalImage),
+            legend = Convert.ToBase64String(groupResult.Legend)
+        });
     }
 
     [HttpGet("getPlantsList")]

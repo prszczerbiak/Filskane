@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
@@ -110,6 +111,33 @@ public class AuthController : ControllerBase
             return Ok("Konto zostało aktywowane.");
         else
             return BadRequest("Nieprawidłowy lub wygasły token.");
+    }
+
+    [HttpPost("deleteAccount")]
+    [Authorize]
+    public IActionResult DeleteAccount([FromBody] DeleteAccountRequest req)
+    {
+        var username = User.Identity?.Name;
+
+        if (string.IsNullOrEmpty(username))
+            return Unauthorized();
+
+        try
+        {
+            // Wywołujemy funkcję, która weryfikuje hasło i usuwa konto
+            bool deleted = _dbService.DeleteUserAccount(username, req.Password);
+
+            if (!deleted)
+                return BadRequest(new { message = "Niepoprawne hasło" });
+
+            // Konto usunięte pomyślnie
+            return Ok(new { message = "Konto zostało usunięte" });
+        }
+        catch (Exception ex)
+        {
+            // Obsługa błędów np. połączenia z bazą
+            return StatusCode(500, new { message = "Wystąpił błąd podczas usuwania konta: " + ex.Message });
+        }
     }
 }
 

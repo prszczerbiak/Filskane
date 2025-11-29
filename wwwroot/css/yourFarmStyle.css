@@ -208,6 +208,7 @@ html, body {
     border-radius: 8px;
 }
 
+
 #fieldNameInput {
     width: 50%; /* zajmuje całą szerokość kontenera */
     padding: 10px 12px; /* wewnętrzne marginesy dla wygody pisania */
@@ -235,4 +236,27 @@ footer {
     left: 0; /* Przypięcie do lewej strony */
     width: 100%; /* Pełna szerokość ekranu */
     box-sizing: border-box; /* Zapobiega przesunięciom przez padding */
+}
+
+.dark-theme body {
+    background-color: #202123; /* szare tło całej strony */
+    color: #e5e5e5; /* jasny tekst */
+}
+
+.dark-theme .content {
+    background-color: #2a2b2e; /* ciemniejsze tło kontenera (GPT-style) */
+    color: #e5e5e5; /* jasny tekst wewnątrz contentu */
+}
+
+.dark-theme .modalContent {
+    background-color: #202123;
+}
+
+.dark-theme .leaflet-popup-content-wrapper {
+    background-color: #2a2b2e; /* ciemniejsze tło kontenera (GPT-style) */
+    color: #e5e5e5; /* jasny tekst wewnątrz contentu */
+}
+
+.dark-theme .leaflet-popup-tip {
+    background-color: #2a2b2e;
 }

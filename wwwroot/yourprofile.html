@@ -5,22 +5,77 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Twój Profil</title>
     <link rel="stylesheet" href="css/yourprofilestyle.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <div class="content">
         <div class="menu">
             <div class="menu-option active">Twoje dane</div>
 
-            <div class="menu-option">Ustawienia</div>
+            <div class="menu-option">Personalizacja</div>
 
-            <div class="menu-option">Opcja 1</div>
-  
+            <div class="menu-option">Zaawansowane</div>
+
         </div>
 
         <div class="description">
-            
+
         </div>
 
+    </div>
+
+    <div id="changeNameModal" class="modal">
+        <div class="modal-content">
+            <h3>Wpisz nowe imię:</h3>
+            <form id="dateForm">
+                <input id="nameInput" required>
+                <div class="modal-footer">
+                    <button type="button" class="btn-close">Anuluj</button>
+                    <button type="submit" class="btn-save">Zapisz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="changeEmailModal" class="modal">
+        <div class="modal-content">
+            <h3>Wpisz nowy adres email:</h3>
+            <form id="emailForm">
+                <input id="emailInput" required>
+                <div id="emailMessage" style="margin-top:5px;"></div> <!-- Wiadomość walidacji -->
+                <div class="modal-footer">
+                    <button type="button" class="btn-close">Anuluj</button>
+                    <button type="submit" class="btn-save">Zapisz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="changeTelModal" class="modal">
+        <div class="modal-content">
+            <h3>Wpisz nowy telefon:</h3>
+            <form id="telForm">
+                <input id="telInput" required placeholder="+48">
+                <div id="telMessage" style="margin-top:5px;"></div> <!-- wiadomość walidacji -->
+                <div class="modal-footer">
+                    <button type="button" class="btn-close">Anuluj</button>
+                    <button type="submit" class="btn-save">Zapisz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="deleteAccountModal" class="modal">
+        <div class="modal-content">
+            <h3>Usunięcie konta jest nieodwracalne. Wszystkie dane zostaną utracone</h3>
+            <form id="deleteForm">
+                <input id="deleteInput" required>
+                <div class="modal-footer">
+                    <button type="button" class="btn-close">Anuluj</button>
+                    <button type="submit" class="btn-delete">Usuń</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <footer>
