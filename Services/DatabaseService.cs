@@ -37,10 +37,10 @@ public class DatabaseService
         using var conn = new OracleConnection(_connectionString);
         conn.Open();
 
-        string sql = @"SELECT PasswordHash 
-                   FROM Users 
-                   WHERE Username = :username 
-                         AND Verification = 1";
+        string sql = @"SELECT PASSWORD_HASH 
+                   FROM USERS
+                   WHERE USERNAME = :username 
+                         AND IS_VERIFIED = 1";
 
         using var cmd = new OracleCommand(sql, conn);
         cmd.Parameters.Add(":username", OracleDbType.Varchar2).Value = username;
@@ -62,9 +62,9 @@ public class DatabaseService
         conn.Open();
 
         string sql = @"
-            SELECT Username, Name, Email, Telephone, FarmX, FarmY
-            FROM Users
-            WHERE Username = :username";
+            SELECT USERNAME, FIRST_NAME, EMAIL, TELEPHONE, FARM_LONGITUDE, FARM_LATITUDE
+            FROM USERS
+            WHERE USERNAME = :username";
 
         using var cmd = new OracleCommand(sql, conn);
         cmd.Parameters.Add(":username", OracleDbType.Varchar2).Value = username;
@@ -100,9 +100,9 @@ public class DatabaseService
         conn.Open();
 
         string sql = @"
-            SELECT Name, Darkmode, Surface, FarmX, FarmY
-            FROM Users
-            WHERE Username = :username";
+            SELECT FIRST_NAME, IS_DARK_MODE, SURFACE_UNIT, FARM_LONGITUDE, FARM_LATITUDE
+            FROM USERS
+            WHERE USERNAME = :username";
 
         using var cmd = new OracleCommand(sql, conn);
         cmd.Parameters.Add(":username", OracleDbType.Varchar2).Value = username;
@@ -140,7 +140,7 @@ public class DatabaseService
             {
                 command.CommandText = @"
                 UPDATE USERS
-                SET SURFACE = :surface
+                SET SURFACE_UNIT = :surface
                 WHERE USERNAME = :username";
 
                 command.Parameters.Add(new OracleParameter("surface", surface));
@@ -162,7 +162,7 @@ public class DatabaseService
             {
                 command.CommandText = @"
                 UPDATE USERS
-                SET Name = :name
+                SET FIRST_NAME = :name
                 WHERE USERNAME = :username";
 
                 command.Parameters.Add(new OracleParameter("name", name));
@@ -184,7 +184,7 @@ public class DatabaseService
             {
                 command.CommandText = @"
                 UPDATE USERS
-                SET Email = :email
+                SET EMAIL = :email
                 WHERE USERNAME = :username";
 
                 command.Parameters.Add(new OracleParameter("email", email));
@@ -206,7 +206,7 @@ public class DatabaseService
             {
                 command.CommandText = @"
                 UPDATE USERS
-                SET Telephone = :phone
+                SET TELEPHONE = :phone
                 WHERE USERNAME = :username";
 
                 command.Parameters.Add(new OracleParameter("phone", phone));
@@ -228,7 +228,7 @@ public class DatabaseService
             {
                 command.CommandText = @"
                 UPDATE USERS
-                SET DARKMODE = :themeFlag
+                SET IS_DARK_MODE = :themeFlag
                 WHERE UPPER(USERNAME) = UPPER(:username)";
 
                 // Zamieniamy na 0/1 w bazie
@@ -249,7 +249,7 @@ public class DatabaseService
 
         string sql = @"
             UPDATE Users
-            SET FarmX = :farmX, FarmY = :farmY
+            SET FARM_LONGITUDE = :farmX, FARM_LATITUDE = :farmY
             WHERE Username = :username";
 
         using var cmd = new OracleCommand(sql, conn);
@@ -274,8 +274,8 @@ public class DatabaseService
         connection.Open();
 
         string query = @"
-            UPDATE Users
-            SET FarmX = NULL, FarmY = NULL
+            UPDATE USERS
+            SET FARM_LONGITUDE = NULL, FARM_LATITUDE = NULL
             WHERE Username = :username";
 
         using var command = new OracleCommand(query, connection);
@@ -307,7 +307,7 @@ public class DatabaseService
         int userId;
         using (var cmdUser = conn.CreateCommand())
         {
-            cmdUser.CommandText = "SELECT UserId FROM USERS WHERE Username = :username";
+            cmdUser.CommandText = "SELECT USER_ID FROM USERS WHERE USERNAME = :username";
             cmdUser.Parameters.Add(new Oracle.ManagedDataAccess.Client.OracleParameter(":username", username));
 
             var result = cmdUser.ExecuteScalar();
@@ -320,9 +320,9 @@ public class DatabaseService
         using var cmd = conn.CreateCommand();
 
         cmd.CommandText = @"
-            INSERT INTO FIELDS (NAME, CENTERX, CENTERY, USERID, GEOJSON, AREA, SOILCOMPLEX, SOILTYPE, SOILSUBSTRATE)
+            INSERT INTO FIELDS (FIELD_NAME, CENTER_LONGITUDE, CENTER_LATITUDE, USER_ID, GEO_JSON, AREA_M2, SOIL_COMPLEX, SOIL_TYPE, SOIL_SUBSTRATE)
             VALUES (:name, :centerX, :centerY, :userId, :geojson, :area, :soilComplex, :soilType, :soilSubstrate)
-            RETURNING FIELDSID INTO :newId";
+            RETURNING FIELD_ID INTO :newId";
 
 
         cmd.Parameters.Add(new Oracle.ManagedDataAccess.Client.OracleParameter(":name", name));
@@ -364,14 +364,14 @@ public class DatabaseService
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
-            SELECT f.FieldsId,
-                   f.Name, 
-                   f.CENTERX, 
-                   f.CENTERY, 
-                   f.GeoJSON
+            SELECT f.FIELD_ID,
+                   f.FIELD_NAME, 
+                   f.CENTER_LONGITUDE, 
+                   f.CENTER_LATITUDE, 
+                   f.GEO_JSON
             FROM FIELDS f
-            JOIN USERS u ON f.UserId = u.UserId
-            WHERE u.Username = :username";
+            JOIN USERS u ON f.USER_ID = u.USER_ID
+            WHERE u.USERNAME = :username";
 
         cmd.Parameters.Add(new OracleParameter(":username", OracleDbType.Varchar2)).Value = username;
 
@@ -405,9 +405,9 @@ public class DatabaseService
 
         // upewniamy się, że pole należy do zalogowanego użytkownika
         string sql = @"
-            DELETE FROM Fields
-            WHERE FieldsId = :fieldId
-              AND UserId = (SELECT UserId FROM Users WHERE Username = :username)";
+            DELETE FROM FIELDS
+            WHERE FIELD_ID = :fieldId
+              AND USER_ID = (SELECT USER_ID FROM Users WHERE Username = :username)";
 
         using var cmd = new OracleCommand(sql, conn);
         cmd.Parameters.Add(":fieldId", OracleDbType.Int32).Value = fieldId;
@@ -433,22 +433,31 @@ public class DatabaseService
         conn.Open();
 
         string sql = @"
-            SELECT f.FieldsId,
-                   f.Name, 
-                   f.CropId,
-                   p.PlantName,        
-                   f.PlantState,
-                   g.CycleName,       
-                   f.SowingDate,
-                   f.SoilComplex,
-                   f.SoilType,
-                   f.SoilSubstrate,
-                   f.Area,
-                   f.Geojson
+            SELECT 
+                f.FIELD_ID,
+                f.FIELD_NAME, 
+                f.CROP_ID,
+                p.PLANT_NAME,        
+                f.PLANT_STATE,
+                g.CYCLE_NAME,       
+                f.SOWING_DATE,
+                sc.COMPLEX_NAME,
+                st.TYPE_NAME,
+                ss.SUBSTRATE_NAME,
+                f.AREA_M2,
+                f.GEO_JSON
             FROM FIELDS f
-            LEFT JOIN PLANTS p ON f.CropId = p.PlantId
-            LEFT JOIN GROWTHCYCLES g ON f.PlantState = g.CycleId
-            WHERE f.FieldsId = :fieldId";
+            LEFT JOIN PLANTS p 
+                ON f.CROP_ID = p.PLANT_ID
+            LEFT JOIN GROWTH_CYCLES g 
+                ON f.PLANT_STATE = g.CYCLE_ID
+            LEFT JOIN SOIL_COMPLEXES sc
+                ON f.SOIL_COMPLEX = sc.COMPLEX_CODE
+            LEFT JOIN SOIL_TYPES st
+                ON f.SOIL_TYPE = st.TYPE_CODE
+            LEFT JOIN SOIL_SUBSTRATES ss
+                ON f.SOIL_SUBSTRATE = ss.SUBSTRATE_CODE
+            WHERE f.FIELD_ID = :fieldId";
 
         using var cmd = new OracleCommand(sql, conn);
         cmd.Parameters.Add(":fieldId", OracleDbType.Int32).Value = fieldId;
@@ -503,17 +512,17 @@ public class DatabaseService
         cmd.CommandText = @"
         UPDATE FIELDS
         SET 
-            CropId = :crop,
-            SowingDate = :dateSow,
-            PlantState = (
-                SELECT CycleId
-                FROM plantStates
-                WHERE PlantId = :cropSub
+            CROP_ID = :crop,
+            SOWING_DATE = :dateSow,
+            PLANT_STATE = (
+                SELECT CYCLE_ID
+                FROM PLANT_STATES
+                WHERE PLANT_ID = :cropSub
                   AND :dateSowSub1 + minDays <= SYSDATE
                   AND :dateSowSub2 + maxDays >= SYSDATE
                 FETCH FIRST 1 ROWS ONLY
             )
-        WHERE FieldsId = :fieldId";
+        WHERE FIELD_ID = :fieldId";
 
         cmd.Parameters.Add(":crop", OracleDbType.Int32).Value = updateDto.Crop;
         cmd.Parameters.Add(":dateSow", OracleDbType.Date).Value = updateDto.SowingDate.Value;
@@ -538,10 +547,10 @@ public class DatabaseService
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
-        SELECT CycleId, CycleName
-        FROM Fields f
-        LEFT JOIN GrowthCycles g ON (f.PlantState = g.CycleId)
-        WHERE fieldsId = :fieldId";
+        SELECT CYCLE_ID, CYCLE_NAME
+        FROM FIELDS f
+        LEFT JOIN GROWTH_CYCLES g ON (f.PLANT_STATE = g.CYCLE_ID)
+        WHERE FIELD_ID = :fieldId";
         cmd.Parameters.Add(":fieldId", OracleDbType.Int32).Value = fieldId;
 
         using var reader = cmd.ExecuteReader();
@@ -585,7 +594,7 @@ public class DatabaseService
         using var conn = new OracleConnection(_connectionString);
         conn.Open();
 
-        string sql = @"INSERT INTO USERS (NAME, USERNAME, EMAIL, PASSWORDHASH, VERIFICATIONTOKEN)
+        string sql = @"INSERT INTO USERS (FIRST_NAME, USERNAME, EMAIL, PASSWORD_HASH, VERIFICATION_TOKEN)
                            VALUES (:name, :username, :email, :passwordhash, :verificationToken)";
 
         using var cmd = new OracleCommand(sql, conn);
@@ -609,7 +618,7 @@ public class DatabaseService
             Console.WriteLine($"Verify user: {token}");
 
             // 🔹 Sprawdź, czy istnieje użytkownik z tym tokenem
-            using (var checkCmd = new OracleCommand("SELECT COUNT(*) FROM Users WHERE VerificationToken = :token", conn))
+            using (var checkCmd = new OracleCommand("SELECT COUNT(*) FROM Users WHERE VERIFICATION_TOKEN = :token", conn))
             {
                 checkCmd.Parameters.Add(new OracleParameter("token", token));
                 int count = Convert.ToInt32(checkCmd.ExecuteScalar());
@@ -622,7 +631,7 @@ public class DatabaseService
 
             // 🔹 Zaktualizuj kolumnę IsVerified i usuń token
             using (var updateCmd = new OracleCommand(
-                "UPDATE Users SET Verification = 1, VerificationToken = NULL WHERE VerificationToken = :token", conn))
+                "UPDATE USERS SET IS_VERIFIED = 1, Verification_Token = NULL WHERE Verification_Token = :token", conn))
             {
                 updateCmd.Parameters.Add(new OracleParameter("token", token));
                 int rowsAffected = updateCmd.ExecuteNonQuery();
@@ -813,7 +822,7 @@ public class DatabaseService
         await conn.OpenAsync();
 
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT GEOJSON FROM FIELDS WHERE FIELDSID = :id";
+        cmd.CommandText = "SELECT GEO_JSON FROM FIELDS WHERE FIELD_ID = :id";
         cmd.Parameters.Add(":id", fieldId);
 
         using var reader = await cmd.ExecuteReaderAsync(System.Data.CommandBehavior.SingleRow);
@@ -1030,7 +1039,7 @@ public class DatabaseService
         {
             await conn.OpenAsync();
 
-            var query = "SELECT plantId, plantName FROM plants ORDER BY plantName";
+            var query = "SELECT PLANT_ID, PLANT_NAME FROM PLANTS ORDER BY PLANT_NAME";
 
             using (var cmd = new OracleCommand(query, conn))
             using (var reader = await cmd.ExecuteReaderAsync())
@@ -1039,8 +1048,8 @@ public class DatabaseService
                 {
                     plants.Add(new PlantDto
                     {
-                        Id = Convert.ToInt32(reader["plantId"]),
-                        Name = reader["plantName"].ToString()
+                        Id = Convert.ToInt32(reader["PLANT_ID"]),
+                        Name = reader["PLANT_NAME"].ToString()
                     });
                 }
             }
@@ -1058,7 +1067,7 @@ public class DatabaseService
         {
             await conn.OpenAsync();
 
-            var query = "SELECT cycleId, minndvi, maxndvi FROM growthcycles";
+            var query = "SELECT CYCLE_ID, MIN_NDVI, MAX_NDVI FROM GROWTH_CYCLES";
 
             using (var cmd = new OracleCommand(query, conn))
             using (var reader = await cmd.ExecuteReaderAsync())
@@ -1067,9 +1076,9 @@ public class DatabaseService
                 {
                     thresholds.Add(new ThresholdDto
                     {
-                        CycleId = Convert.ToInt32(reader["cycleId"]),
-                        MinNdvi = Convert.ToDouble(reader["minNdvi"]),
-                        MaxNdvi = Convert.ToDouble(reader["maxNdvi"])
+                        CycleId = Convert.ToInt32(reader["CYCLE_ID"]),
+                        MinNdvi = Convert.ToDouble(reader["MIN_NDVI"]),
+                        MaxNdvi = Convert.ToDouble(reader["MAX_NDVI"])
                     });
                 }
             }
@@ -1088,7 +1097,7 @@ public class DatabaseService
         {
             // 1️⃣ Weryfikacja hasła użytkownika
             using var checkCmd = new OracleCommand(
-                "SELECT COUNT(*) FROM users WHERE username = :username AND passwordhash = :password",
+                "SELECT COUNT(*) FROM USERS WHERE USERNAME = :username AND PASSWORD_HASH = :password",
                 conn
             );
             checkCmd.Parameters.Add(new OracleParameter("username", username));
@@ -1103,7 +1112,7 @@ public class DatabaseService
 
             // 2️⃣ Usuwanie użytkownika (kaskadowe dla wszystkich powiązanych tabel)
             using var deleteCmd = new OracleCommand(
-                "DELETE FROM users WHERE username = :username",
+                "DELETE FROM USERS WHERE USERNAME = :username",
                 conn
             );
             deleteCmd.Parameters.Add(new OracleParameter("username", username));
