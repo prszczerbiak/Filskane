@@ -36,7 +36,7 @@ if (cachedUser) {
     document.getElementById("welcome").innerText = `Witaj, ${data.name} 😊`;
 } else if (token) {
     // Jeśli nie ma danych w pamięci, pobierz z API
-    fetch("/api/userinfo/getShortInfo", {
+    fetch("/api/settings/getShortInfo", {
         headers: { "Authorization": "Bearer " + token }
     })
         .then(res => {
@@ -46,6 +46,7 @@ if (cachedUser) {
         .then(data => {
             // Zapisz dane w localStorage, żeby przy następnym wejściu nie fetchować ponownie
             localStorage.setItem("userInfo", JSON.stringify(data));
+            
             document.getElementById("welcome").innerText = `Witaj, ${data.name} 😊`;
         })
         .catch(err => {

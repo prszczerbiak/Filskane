@@ -130,14 +130,14 @@ fetch('/api/farm/getUserFields', { headers: { "Authorization": "Bearer " + token
         userFieldsLayer.clearLayers();
 
         data.forEach(field => {
-            if (field.geoJSON) {
+            if (field.geojson) {
                 try {
-                    const geojsonObj = JSON.parse(field.geoJSON);
+                    const geojsonObj = JSON.parse(field.geojson);
                     const layer = L.geoJSON(geojsonObj, {
                         style: { color: '#008000', weight: 2, fillOpacity: 0.3 }
                     }).addTo(map);
 
-                    createFieldLayer(layer, field.name, field.fieldId);
+                    createFieldLayer(layer, field.name, field.id);
                 } catch (e) {
                     console.error("Błąd parsowania GeoJSON pola:", e);
                 }

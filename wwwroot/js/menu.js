@@ -90,7 +90,7 @@ const content = {
 
 async function loadUserShortInfo(token) {
     try {
-        const response = await fetch("https://localhost:7273/api/userinfo/getShortInfo", {
+        const response = await fetch("https://localhost:7273/api/settings/getShortInfo", {
             method: "GET",
             headers: {
                 "Authorization": "Bearer " + token
@@ -149,7 +149,7 @@ async function loadUserProfile() {
     }
 
     try {
-        const response = await fetch("/api/userInfo/getLongInfo", {
+        const response = await fetch("/api/settings/getLongInfo", {
             method: "GET",
             headers: {
                 "Authorization": `Bearer ${token}`
@@ -164,7 +164,7 @@ async function loadUserProfile() {
         requestAnimationFrame(() => {
             document.getElementById("name").value = data.name ?? "";
             document.getElementById("email").value = data.email ?? "";
-            document.getElementById("phone").value = data.telephone ?? "";
+            document.getElementById("phone").value = data.phone ?? "";
         });
 
     } catch (err) {
@@ -229,7 +229,7 @@ description.addEventListener('click', (e) => {
 
     // wyślij aktualizację tylko dla surface
     const token = localStorage.getItem("token");
-    fetch("https://localhost:7273/api/userinfo/updateSurface", {
+    fetch("https://localhost:7273/api/settings/updateSurface", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -289,8 +289,35 @@ description.addEventListener('click', (e) => {
     highlight.style.left = `calc(${index} * 100% / ${options.length})`;
 
     const theme = themeOption.dataset.theme;
+    const themeInt = (theme === 'dark') ? 1 : 0;
     localStorage.setItem('theme', theme);
     applyTheme(theme);
+
+    // --- NOWOŚĆ: Zapis do bazy danych ---
+    const token = localStorage.getItem("token");
+
+    // Opcjonalnie: aktualizujemy też obiekt userInfo w localStorage, żeby był spójny
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || "{}");
+    userInfo.theme = theme;
+    localStorage.setItem('userInfo', JSON.stringify(userInfo));
+
+    // Wysyłamy do backendu
+    fetch("/api/settings/updateTheme", { // Upewnij się, że ta ścieżka pasuje do C# [Route]
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ theme: themeInt })
+    })
+        .then(res => {
+            if (!res.ok) throw new Error("Błąd zapisu motywu");
+            console.log(`✅ Motyw ${theme} zapisany w bazie.`);
+        })
+        .catch(err => {
+            console.error("❌ Błąd przy zapisie motywu:", err);
+            // Opcjonalnie: Pokaż użytkownikowi dymek z błędem
+        });
 });
 
 function applyTheme(theme) {
@@ -349,7 +376,7 @@ document.getElementById("dateForm").addEventListener("submit", async function (e
 
     const newName = document.getElementById("nameInput").value;
 
-    const response = await fetch("/api/userInfo/updateName", {
+    const response = await fetch("/api/settings/updateName", {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ name: newName })
@@ -371,7 +398,7 @@ document.getElementById("emailForm").addEventListener("submit", async function (
 
     const newEmail = document.getElementById("emailInput").value;
 
-    const response = await fetch("/api/userInfo/updateEmail", {
+    const response = await fetch("/api/settings/updateEmail", {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ email: newEmail })
@@ -393,7 +420,7 @@ document.getElementById("telForm").addEventListener("submit", async function (e)
 
     const newPhone = document.getElementById("telInput").value;
 
-    const response = await fetch("/api/userInfo/updatePhone", {
+    const response = await fetch("/api/settings/updatePhone", {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ phone: newPhone })
@@ -473,7 +500,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
             const token = localStorage.getItem("token"); // jeśli używasz JWT
-            const response = await fetch("/api/userInfo/updateEmail", {
+            const response = await fetch("/api/settings/updateEmail", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -549,7 +576,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
             const token = localStorage.getItem("token");
-            const response = await fetch("/api/userInfo/updatePhone", {
+            const response = await fetch("/api/settings/updatePhone", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

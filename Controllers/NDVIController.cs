@@ -10,6 +10,8 @@ namespace WebApplication1.Controllers
 {
     [ApiController]
     [Route("api/ndvi")]
+    [Obsolete("Ten kontroler jest przestarzały. Funkcjonalność bezpośredniego pobierania skanów pól została wyłączona. ")]
+    [ApiExplorerSettings(IgnoreApi = true)]
     public class NDVIController : ControllerBase
     {
         private readonly SentinelHubService _sentinelService;

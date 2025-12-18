@@ -21,7 +21,7 @@
             localStorage.setItem("token", data.token);
 
             // 🔹 Od razu pobierz dane użytkownika po zalogowaniu
-            const userResponse = await fetch("https://localhost:7273/api/userinfo/getShortInfo", {
+            const userResponse = await fetch("https://localhost:7273/api/settings/getShortInfo", {
                 method: "GET",
                 headers: {
                     "Authorization": "Bearer " + data.token

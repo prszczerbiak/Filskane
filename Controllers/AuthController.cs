@@ -1,143 +1,79 @@
 ﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
-using Oracle.ManagedDataAccess.Client;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
 using WebApplication1.Models;
 using WebApplication1.Services;
 
-[Route("api/auth")]
-[ApiController]
-public class AuthController : ControllerBase
+namespace WebApplication1.Controllers
 {
-    private readonly DatabaseService _dbService;
-    private readonly EmailService _emailService;
-    private readonly IConfiguration _config;
-    private readonly ILogger<EmailService> _logger;
-    private readonly PasswordHasher<string> _passwordHasher = new PasswordHasher<string>();
-
-    public AuthController(DatabaseService dbService, EmailService emailService, IConfiguration config, ILogger<EmailService> logger)
+    [Route("api/auth")]
+    [ApiController]
+    public class AuthController : ControllerBase
     {
-        _dbService = dbService;
-        _config = config;
-        _emailService = emailService;
-        _logger = logger;
-    }
+        // Używamy AuthService zgodnie z diagramem, zamiast surowego DbService
+        private readonly AuthService _authService;
 
-    [HttpPost("login")]
-    public IActionResult Login([FromBody] WebApplication1.Models.LoginRequest request)
-    {
-        if (_dbService.ValidateUser(request.Username, request.Password))
+        public AuthController(AuthService authService)
         {
-            var token = GenerateJwtToken(request.Username);
-            return Ok(new { token });
+            _authService = authService;
         }
-        return Unauthorized("Nieprawidłowy login lub hasło.");
-    }
 
-    private string GenerateJwtToken(string username)
-    {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginRequest request)
+        {
+            // Cała logika walidacji hasła i generowania tokena jest w serwisie
+            var result = await _authService.LoginAsync(request);
 
-        var token = new JwtSecurityToken(
-            _config["Jwt:Issuer"],
-            _config["Jwt:Issuer"],
-            new[]
+            if (result.Success)
             {
-                new Claim(ClaimTypes.Name, username)
-            },
-            expires: DateTime.UtcNow.AddHours(2),
-            signingCredentials: creds
-        );
+                return Ok(new { token = result.Token });
+            }
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
-    }
-
-    [HttpPost("check-email")]
-    public IActionResult CheckEmail([FromBody] EmailRequest request)
-    {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
-
-        bool exists = _dbService.CheckIfEmailExists(request.Email);
-
-        return Ok(new { exists });
-    }
-
-    [HttpPost("register")]
-    public IActionResult Register([FromBody] WebApplication1.Models.RegisterRequest request)
-    {
-        try
-        {
-            string token = GenerateVerificationToken();
-            _dbService.RegisterUser(request, token); // Zapisz użytkownika i token w DB
-
-            Task.Run(() => _emailService.SendVerificationEmail(request.Email, token));
-
-            return Ok(new { message = "Użytkownik zarejestrowany. Wysłano e-mail weryfikacyjny." });
+            return Unauthorized("Nieprawidłowy login lub hasło.");
         }
-        catch (OracleException ex)
+
+        [HttpPost("register")]
+        public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
-            _logger.LogError(ex, "Błąd bazy danych podczas rejestracji użytkownika {Email}", request.Email);
-            return StatusCode(500, new { message = "Błąd bazy danych: " + ex.Message });
+            try
+            {
+                // Kontroler nie wie nic o tokenach weryfikacyjnych ani mailach.
+                // Mówi tylko serwisowi: "Zarejestruj tego człowieka".
+                await _authService.RegisterUserAsync(request);
+                return Ok(new { message = "Użytkownik zarejestrowany. Sprawdź e-mail." });
+            }
+            catch (Exception ex)
+            {
+                // W produkcji nie zwracamy ex.Message użytkownikowi (security!), ale w inżynierce ujdzie
+                return StatusCode(500, new { message = "Wystąpił błąd serwera." });
+            }
         }
-        catch (InvalidOperationException ex) // przechwytywane z EmailService
+
+        [HttpPost("check-email")]
+        public async Task<IActionResult> CheckEmail([FromBody] CheckEmailRequest request)
         {
-            _logger.LogError(ex, "Błąd wysyłki maila dla {Email}", request.Email);
-            return StatusCode(500, new { message = "Błąd wysyłki maila: " + ex.Message });
+            bool exists = await _authService.EmailExistsAsync(request.Email);
+            return Ok(new { exists });
         }
-        catch (Exception ex)
+
+        [HttpGet("verify")]
+        public async Task<IActionResult> Verify([FromQuery] string token)
         {
-            _logger.LogError(ex, "Nieoczekiwany błąd przy rejestracji użytkownika {Email}", request.Email);
-            return StatusCode(500, new { message = "Wewnętrzny błąd serwera: " + ex.Message });
+            bool success = await _authService.VerifyAccountAsync(token);
+            return success ? Ok("Konto aktywowane.") : BadRequest("Błędny token.");
         }
-    }
 
-    public string GenerateVerificationToken()
-    {
-        return Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-    }
-
-    [HttpGet("verify")]
-    public IActionResult Verify([FromQuery] string token)
-    {
-        bool success = _dbService.VerifyUser(token);
-        if (success)
-            return Ok("Konto zostało aktywowane.");
-        else
-            return BadRequest("Nieprawidłowy lub wygasły token.");
-    }
-
-    [HttpPost("deleteAccount")]
-    [Authorize]
-    public IActionResult DeleteAccount([FromBody] DeleteAccountRequest req)
-    {
-        var username = User.Identity?.Name;
-
-        if (string.IsNullOrEmpty(username))
-            return Unauthorized();
-
-        try
+        [HttpPost("deleteAccount")]
+        [Authorize] // To zapewnia, że User.Identity jest wypełnione
+        public async Task<IActionResult> DeleteAccount([FromBody] DeleteAccountRequest req)
         {
-            // Wywołujemy funkcję, która weryfikuje hasło i usuwa konto
-            bool deleted = _dbService.DeleteUserAccount(username, req.Password);
+            var username = User.Identity?.Name;
+            if (string.IsNullOrEmpty(username)) return Unauthorized();
 
-            if (!deleted)
-                return BadRequest(new { message = "Niepoprawne hasło" });
+            bool deleted = await _authService.DeleteAccountAsync(username, req.Password);
 
-            // Konto usunięte pomyślnie
-            return Ok(new { message = "Konto zostało usunięte" });
-        }
-        catch (Exception ex)
-        {
-            // Obsługa błędów np. połączenia z bazą
-            return StatusCode(500, new { message = "Wystąpił błąd podczas usuwania konta: " + ex.Message });
+            if (!deleted) return BadRequest(new { message = "Niepoprawne hasło." });
+
+            return Ok(new { message = "Konto usunięte." });
         }
     }
 }
-

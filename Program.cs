@@ -4,8 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using System.Configuration;
 using System.Text;
-using WebApplication1.Analysis;
 using WebApplication1.Services;
+using WebApplication1.DAL;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,21 +16,33 @@ builder.Services.AddSwaggerGen();
 
 // Odczytaj connection string i dodaj do DI
 builder.Services.AddSingleton<IPasswordHasherService, Argon2PasswordHasherService>();
-builder.Services.AddSingleton<DatabaseService>(sp =>
-{
-    var configuration = sp.GetRequiredService<IConfiguration>();
-    var hasher = sp.GetRequiredService<IPasswordHasherService>();
 
-    var oracleDbConn = configuration.GetConnectionString("OracleDb");
-    var gdalOracleConn = configuration.GetConnectionString("GdalOracle");
+builder.Services.AddScoped<AuthDAL>();
+builder.Services.AddScoped<FarmDAL>();
+builder.Services.AddScoped<FieldDAL>();
+builder.Services.AddScoped<ScanDAL>();
+builder.Services.AddScoped<SettingsDAL>();
 
-    return new DatabaseService(oracleDbConn, gdalOracleConn, hasher);
-});
-builder.Services.AddSingleton<EmailService>();
+//builder.Services.AddSingleton<DatabaseService>(sp =>
+//{
+//    var configuration = sp.GetRequiredService<IConfiguration>();
+//    var hasher = sp.GetRequiredService<IPasswordHasherService>();
+
+//    var oracleDbConn = configuration.GetConnectionString("OracleDb");
+//    var gdalOracleConn = configuration.GetConnectionString("GdalOracle");
+
+//    return new DatabaseService(oracleDbConn, gdalOracleConn, hasher);
+//});
+builder.Services.AddScoped<EmailService>();
 builder.Services.AddHttpClient<SentinelHubService>();
-builder.Services.AddHostedService<ThresholdService>();
-builder.Services.AddSingleton<ThresholdStore>();
-builder.Services.AddTransient<NdviAnalysisService>();
+builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<SettingsService>();
+builder.Services.AddScoped<FarmService>();
+builder.Services.AddScoped<FieldsListService>();
+builder.Services.AddScoped<AnalysisService>();
+builder.Services.AddScoped<FieldService>();
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<PythonService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

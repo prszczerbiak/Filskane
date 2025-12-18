@@ -14,7 +14,7 @@ namespace WebApplication1.Services
             _logger = logger;
         }
 
-        public async void SendVerificationEmail(string toEmail, string token)
+        public async Task SendVerificationEmailAsync(string toEmail, string token)
         {
             string verificationLink = $"https://localhost:7273/api/auth/verify?token={token}";
 

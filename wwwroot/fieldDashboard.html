@@ -197,179 +197,147 @@
     </footer>
 
     <script>
+        // =========================================================
+        // 1. ZMIENNE GLOBALNE I KONFIGURACJA
+        // =========================================================
 
+        // Konfiguracja motywu
         const savedTheme = localStorage.getItem('theme') || 'light';
         if (savedTheme === 'dark') {
             document.documentElement.classList.add('dark-theme');
         }
 
-        function handleUnauthorized() {
-            alert("Twoja sesja wygasła. Zaloguj się ponownie.");
-            localStorage.removeItem("token"); // usuń stary token
-            window.location.href = "index.html"; // przekierowanie do strony logowania
-        }
-
-        // Interceptor dla fetch, żeby złapać 401
-        const originalFetch = window.fetch;
-        window.fetch = async (...args) => {
-            const response = await originalFetch(...args);
-            if (response.status === 401) {
-                handleUnauthorized(); // pokaz alert i wróć do logowania
-                throw new Error("Unauthorized");
-            }
-            return response;
-        };
-
-        // Sprawdzenie od razu przy ładowaniu strony
-        const token = localStorage.getItem("token");
-        if (!token) {
-            handleUnauthorized();
-            throw new Error("Brak tokena – zatrzymano dalsze wykonywanie skryptu");
-        }
-
-        function updateColorbar() {
-            const colorbar = document.getElementById("colorbar");
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            const isDarkMode = savedTheme === 'dark';
-
-            if (colorbar) {
-                colorbar.src = isDarkMode ? '/css/colorbarDark.png' : '/css/colorbar.png';
-            }
-        }
-
+        // Pobieranie parametrów URL i Tokena
         const params = new URLSearchParams(window.location.search);
         const fieldId = params.get("fieldId");
+        const token = localStorage.getItem("token");
 
+        // Elementy DOM (cache'ujemy je, żeby nie szukać ciągle w dokumencie)
         const cropEl = document.querySelector("#crop");
         const stateEl = document.querySelector("#state");
         const dateEl = document.querySelector("#date");
-
         const cropInput = document.querySelector("#cropInput");
-        const stateInput = document.querySelector("#stateInput");
         const dateInput = document.querySelector("#dateInput");
 
-        // pobieranie danych z backendu
+        const clusterButton = document.getElementById("clustering");
+        const ndviImage = document.getElementById("ndviImage");
+        const colorbar = document.getElementById("colorbar");
+        const legendImage = document.getElementById("legendImage");
+
+        // STAN APLIKACJI (Zmienne Globalne)
         let selectedCropId = null;
         let selectedPlantStateId = null;
         let selectedSowingDate = null;
         let geojson = null;
         let imageBbox = null;
+        let ndviDataCache = null; // Tu trzymamy aktualnie wyświetlaną macierz NDVI
 
+        // =========================================================
+        // 2. UWIERZYTELNIANIE I INTERCEPTOR
+        // =========================================================
 
+        if (!token) handleUnauthorized();
 
-        // Obsługa przycisków edycji
-        document.querySelectorAll(".edit-btn").forEach(btn => {
-            btn.addEventListener("click", (e) => {
-                e.preventDefault();
-                const field = btn.dataset.field;
+        function handleUnauthorized() {
+            alert("Twoja sesja wygasła. Zaloguj się ponownie.");
+            localStorage.removeItem("token");
+            window.location.href = "index.html";
+        }
 
-                if (field === "crop") {
-                    cropEl.value = "";
-                    document.getElementById("cropModal").style.display = "block";
-                    cropInput.querySelectorAll('option:not([disabled])').forEach(o => o.remove());
+        const originalFetch = window.fetch;
+        window.fetch = async (...args) => {
+            const response = await originalFetch(...args);
+            if (response.status === 401) {
+                handleUnauthorized();
+                throw new Error("Unauthorized");
+            }
+            return response;
+        };
 
-                    // Pobranie listy upraw z backendu
-                    fetch(`/api/field/getPlantsList`, {
-                        headers: {
-                            "Authorization": "Bearer " + token
-                        }
-                    })
-                        .then(res => {
-                            if (!res.ok) throw new Error("Błąd przy pobieraniu upraw");
-                            return res.json();
-                        })
-                        .then(plants => {
-                            // Wyczyść poprzednie opcje
+        // =========================================================
+        // 3. INICJALIZACJA STRONY
+        // =========================================================
 
-
-                            // Dodaj nowe opcje
-                            plants.forEach(p => {
-                                const option = document.createElement("option");
-                                option.value = p.id;
-                                option.textContent = p.name;
-                                cropInput.appendChild(option);
-                            });
-
-                            // Ustaw placeholder na aktualną wartość pola
-                            if (cropEl.textContent) {
-                                const match = Array.from(cropInput.options).find(o => o.textContent === cropEl.textContent);
-                                if (match) {
-                                    cropInput.value = match.value;
-                                    selectedCropId = match.value; // zapisz ID w zmiennej
-                                }
-                            }
-                        })
-                        .catch(err => console.error(err));
-                }
-                if (field === "date") {
-                    document.getElementById("dateModal").style.display = "block";
-                }
-            });
+        document.addEventListener("DOMContentLoaded", () => {
+            console.log("🚀 Start aplikacji...");
+            loadFieldData();      // 1. Pobierz dane o polu
+            // loadLatestScan();  // 2. Pobierz najnowszy skan (opcjonalnie, jeśli chcesz od razu)
         });
 
-        //document.querySelectorAll(".modal").forEach(modal => {
-        //    const cancelBtn = modal.querySelector(".btn-cancel");
+        // =========================================================
+        // 4. POBIERANIE DANYCH POLA
+        // =========================================================
 
-        //    cancelBtn.onclick = () => modal.style.display = "none";
+        function formatArea(areaInM2) {
+            const userInfo = JSON.parse(localStorage.getItem('userInfo') || "{}");
+            const surfaceType = userInfo.surface ?? 0;
+            let value, label;
+            switch (surfaceType) {
+                case 1: value = (areaInM2 / 100).toFixed(2); label = 'a'; break;
+                case 2: value = (areaInM2 / 4046.86).toFixed(4); label = 'akr'; break;
+                default: value = (areaInM2 / 10000).toFixed(4); label = 'ha';
+            }
+            return `${value} ${label}`;
+        }
 
-        //    window.addEventListener("click", (event) => {
-        //        if (event.target === modal) {
-        //            modal.style.display = "none";
-        //        }
-        //    });
-        //});
-
-        // Zapis w cropModal
-        document.querySelector("#cropModal form").addEventListener("submit", (e) => {
-            e.preventDefault();
-            const selectedOption = cropInput.options[cropInput.selectedIndex];
-            cropEl.textContent = selectedOption.textContent;
-            selectedCropId = selectedOption.value;
-            console.log("Dane wysyłane do backendu:", {
-                crop: selectedCropId,
-                sowingDate: selectedSowingDate
-            });
-            updateField({ crop: selectedCropId, sowingDate: selectedSowingDate });
-            document.getElementById("cropModal").style.display = "none";
-        });
-
-        // Zapis w dateModal
-        document.querySelector("#dateModal form").addEventListener("submit", (e) => {
-            e.preventDefault();
-            selectedSowingDate = dateInput.value;
-            const [year, month, day] = dateInput.value.split("-");
-            dateEl.textContent = `${day}-${month}-${year}`;
-            console.log("Dane wysyłane do backendu:", {
-                crop: selectedCropId,
-                sowingDate: selectedSowingDate
-            });
-            updateField({ crop: selectedCropId, sowingDate: selectedSowingDate });
-            document.getElementById("dateModal").style.display = "none";
-        });
-
-        // Funkcja aktualizacji w backendzie
-        function updateField(payload) {
-            fetch(`/api/field/update/${fieldId}`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": "Bearer " + token
-                },
-                body: JSON.stringify(payload)
+        function loadFieldData() {
+            fetch(`/api/field/getData/${fieldId}`, {
+                method: "GET",
+                headers: { "Authorization": "Bearer " + token }
             })
-                .then(async res => {
-                    if (!res.ok) {
-                        const err = await res.json(); // teraz jest JSON { error: "..." }
-                        throw new Error(err.error || "Błąd zapisu");
-                    }
+                .then(res => {
+                    if (!res.ok) throw new Error("Błąd: " + res.status);
                     return res.json();
                 })
-                .then(updated => {
-                    getCycleInfo();
+                .then(data => {
+                    // Aktualizacja UI
+                    window.lastLoadedFieldData = data;
+                    document.querySelector(".title").textContent = `Pole: ${data.name}`;
+                    document.querySelector("#fieldName").textContent = data.name;
+                    document.querySelector("#area").textContent = formatArea(data.area);
+
+                    cropEl.textContent = data.plantName ?? "Nieuzupełnione";
+                    stateEl.textContent = data.cycleName ?? "Nieuzupełnione";
+
+                    // Obsługa daty
+                    if (data.sowingDate) {
+                        const isoDate = data.sowingDate.split('T')[0];
+                        selectedSowingDate = isoDate;
+                        const [y, m, d] = isoDate.split('-');
+                        dateEl.textContent = `${d}.${m}.${y}`;
+                    } else {
+                        selectedSowingDate = null;
+                        dateEl.textContent = "Nieuzupełnione";
+                    }
+
+                    // Gleba
+                    document.querySelector("#complex").textContent = data.soilComplex;
+                    document.querySelector("#type").textContent = data.soilType;
+                    document.querySelector("#substrate").textContent = data.soilSubstrate;
+
+                    // BBOX
+                    const bboxEl = document.querySelector("#minBbox");
+                    if (data.minBbox) {
+                        try {
+                            const bbox = JSON.parse(data.minBbox);
+                            bboxEl.innerText = `Min: [${bbox.MinX.toFixed(5)}, ${bbox.MinY.toFixed(5)}]\nMax: [${bbox.MaxX.toFixed(5)}, ${bbox.MaxY.toFixed(5)}]`;
+                        } catch (e) {
+                            bboxEl.textContent = data.minBbox;
+                        }
+                    } else {
+                        bboxEl.textContent = "Brak danych";
+                    }
+
+                    // AKTUALIZACJA ZMIENNYCH GLOBALNYCH (Kluczowe!)
+                    selectedCropId = data.cropId;
+                    selectedPlantStateId = data.plantState; // ID cyklu z bazy
+                    geojson = data.geojson;
+
+
+                    // Po załadowaniu danych pola, ładujemy skan
+                    loadLatestScan();
                 })
-                .catch(err => console.log("Błąd zapisu: " + err.message));
-
-
+                .catch(err => console.error("Błąd przy pobieraniu danych pola:", err));
         }
 
         async function getCycleInfo() {
@@ -378,216 +346,455 @@
                     headers: { "Authorization": "Bearer " + token }
                 });
 
-                if (!res.ok) {
-                    const text = await res.text(); // zamiast res.json()
-                    throw new Error(`Błąd serwera: ${res.status}, treść: ${text}`);
+                if (res.status === 204) {
+                    handleNoCycle();
+                    return;
                 }
-                const data = await res.json();
-                console.log(data.cycleName)
-                selectedPlantStateId = data.cycleId;
-                stateEl.textContent = data.cycleName;
+                if (!res.ok) {
+                    const txt = await res.text();
+                    throw new Error(txt);
+                }
 
+                const text = await res.text();
+                const data = text ? JSON.parse(text) : null;
+
+                if (data) {
+                    console.log("Pobrano cykl osobno:", data);
+                    // Dostosuj nazwy do swojego DTO (id/name vs cycleId/cycleName)
+                    selectedPlantStateId = data.id || data.cycleId;
+                    stateEl.textContent = data.name || data.cycleName;
+                } else {
+                    handleNoCycle();
+                }
             } catch (err) {
-                console.error("Błąd:", err.message);
-                return null;
+                console.error("Błąd getCycleInfo:", err);
+                stateEl.textContent = "Błąd pobierania";
             }
-
         }
 
-        //document.querySelector("#scanBtn").addEventListener("click", async () => {
-        //    try {
-        //        const res = await fetch(`/api/ndvi/download/${fieldId}`, {
-        //            method: "POST",
-        //            headers: { "Authorization": "Bearer " + token }
-        //        });
+        function handleNoCycle() {
+            console.log("Brak cyklu.");
+            selectedPlantStateId = 0;
+            stateEl.textContent = "Nie określono (brak daty siewu)";
+        }
 
-        //        await loadLatestScan();
-        //    } catch (err) {
-        //        alert("❌ " + err.message);
-        //        console.error(err);
-        //    }
-        //});
+        // =========================================================
+        // 5. EDYCJA DANYCH (MODALE)
+        // =========================================================
+
+        // Otwieranie Modala Rośliny
+        document.querySelector('.edit-btn[data-field="crop"]').addEventListener("click", (e) => {
+            e.preventDefault();
+            document.getElementById("cropModal").style.display = "block";
+            cropInput.innerHTML = ""; // Czyścimy
+
+            fetch(`/api/field/getPlantsList`, { headers: { "Authorization": "Bearer " + token } })
+                .then(res => res.json())
+                .then(plants => {
+                    plants.forEach(p => {
+                        const option = document.createElement("option");
+                        option.value = p.id;
+                        option.textContent = p.name;
+                        cropInput.appendChild(option);
+                    });
+                    if (selectedCropId) cropInput.value = selectedCropId;
+                });
+        });
+
+        // Zapis Rośliny
+        document.querySelector("#cropModal form").addEventListener("submit", (e) => {
+            e.preventDefault();
+
+            // 1. Pobieramy ID
+            const newVal = parseInt(cropInput.value);
+
+            // 2. Pobieramy NAZWĘ wybranej opcji (do wyświetlenia)
+            const selectedOption = cropInput.options[cropInput.selectedIndex];
+
+            if (newVal) {
+                selectedCropId = newVal;
+                // ✅ AKTUALIZACJA UI: Wpisujemy nazwę rośliny do elementu na stronie
+                if (selectedOption) {
+                    cropEl.textContent = selectedOption.textContent;
+                }
+            }
+
+            // 3. Wysyłamy update
+            updateField({ cropId: selectedCropId, sowingDate: selectedSowingDate });
+            document.getElementById("cropModal").style.display = "none";
+        });
+
+        // Otwieranie Modala Daty
+        document.querySelector('.edit-btn[data-field="date"]').addEventListener("click", (e) => {
+            e.preventDefault();
+            document.getElementById("dateModal").style.display = "block";
+            if (selectedSowingDate) dateInput.value = selectedSowingDate;
+        });
+
+        // Zapis Daty
+        document.querySelector("#dateModal form").addEventListener("submit", (e) => {
+            e.preventDefault();
+
+            // 1. Pobieramy wartość z inputa
+            const rawDate = dateInput.value;
+
+            if (rawDate) {
+                selectedSowingDate = rawDate;
+
+                // ✅ AKTUALIZACJA UI: Formatowanie daty YYYY-MM-DD -> DD-MM-YYYY
+                const [year, month, day] = rawDate.split("-");
+                dateEl.textContent = `${day}.${month}.${year}`;
+            } else {
+                selectedSowingDate = null;
+                dateEl.textContent = "Nieuzupełnione";
+            }
+
+            // 2. Zabezpieczenie przed utratą CropID (o którym mówiliśmy wcześniej)
+            if (!selectedCropId) {
+                console.warn("⚠️ Brak selectedCropId, próbuję pobrać z cache/inputa...");
+                // Tu można dodać logikę ratunkową, jeśli wciąż masz ten problem
+            }
+
+            // 3. Wysyłamy update
+            updateField({ cropId: selectedCropId, sowingDate: selectedSowingDate });
+            document.getElementById("dateModal").style.display = "none";
+        });
+
+        function updateField(payload) {
+            console.log("Wysyłam update:", payload);
+            fetch(`/api/field/update/${fieldId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+                body: JSON.stringify(payload)
+            })
+                .then(async res => {
+                    if (!res.ok) {
+                        const err = await res.json();
+                        throw new Error(err.error || "Błąd zapisu");
+                    }
+                    return res.json();
+                })
+                .then(() => {
+                    alert("Zapisano zmiany!");
+                    getCycleInfo(); // Odśwież cykl
+                    // Opcjonalnie przeładuj całą stronę dla pewności
+                    // location.reload();
+                })
+                .catch(err => alert("Błąd zapisu: " + err.message));
+        }
+
+        // =========================================================
+        // 6. OBSŁUGA SKANÓW (RGB, HISTORIA)
+        // =========================================================
 
         async function loadLatestScan() {
             try {
-
                 const res = await fetch(`/api/field/latestScan/${fieldId}`, {
                     method: "POST",
-                    headers: {
-                        "Authorization": "Bearer " + token,
-                        "Content-Type": "application/json"
-                    },
+                    headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
                     body: JSON.stringify({ geojson })
                 });
 
-                // 204 No Content = brak danych, nie jest błędem
+                const img = document.querySelector("#scanImage");
+                const dateLabel = document.querySelector("#scanDate"); // Pobieramy element raz
+
                 if (res.status === 204) {
-                    document.querySelector("#scanImage").alt = "Brak obrazu";
-                    document.querySelector("#scanImage").src = ""; // usuń poprzedni obraz
-                    document.querySelector("#scanDate").textContent = "Brak danych";
+                    img.alt = "Brak obrazu";
+                    img.src = "";
+                    dateLabel.textContent = "Brak danych";
                     return;
                 }
+                if (!res.ok) throw new Error("Błąd pobierania skanu");
 
-                // inne błędy serwera
-                if (!res.ok) {
-                    const errorText = await res.text();
-                    throw new Error(`Błąd serwera (${res.status}): ${errorText}`);
+                const blob = await res.blob();
+                img.src = URL.createObjectURL(blob);
+                img.alt = "Obraz satelitarny";
+
+                // --- ZMIANA FORMATOWANIA DATY ---
+                const scanDateHeader = res.headers.get("X-Scan-Date");
+
+                if (scanDateHeader && scanDateHeader !== "Brak danych") {
+                    // Tworzymy obiekt daty i formatujemy go po polsku (DD.MM.YYYY)
+                    dateLabel.textContent = new Date(scanDateHeader).toLocaleDateString('pl-PL');
+                } else {
+                    dateLabel.textContent = "Nieznana";
                 }
 
-                // jest obraz → odczyt blob
-                const blob = await res.blob();
-                const url = URL.createObjectURL(blob);
-                document.querySelector("#scanImage").src = url;
-                document.querySelector("#scanImage").alt = "Obraz satelitarny";
-
-                // odczyt daty z nagłówka
-                const scanDate = res.headers.get("X-Scan-Date");
-                document.querySelector("#scanDate").textContent = scanDate || "Nieznana";
-
             } catch (err) {
-                console.error("❌ Błąd przy pobieraniu obrazu:", err);
-                document.querySelector("#scanImage").alt = "Brak obrazu";
-                document.querySelector("#scanImage").src = ""; // usuń poprzedni obraz
-                document.querySelector("#scanDate").textContent = "Brak danych";
+                console.error("Błąd skanu:", err);
             }
         }
 
-        //document.addEventListener("DOMContentLoaded", loadLatestScan);
-
+        // Historia Skanów
         document.querySelector("#historyBtn").addEventListener("click", async () => {
             const modal = document.getElementById("historyModal");
             const tbody = modal.querySelector("#scanHistoryTable tbody");
-            tbody.innerHTML = "<tr><td colspan='2'>Ładowanie...</td></tr>";
+            tbody.innerHTML = "<tr><td colspan='4'>Ładowanie...</td></tr>";
+            modal.style.display = "block";
 
             try {
-                const res = await fetch(`/api/field/getScansHistory/${fieldId}`, {
-                    headers: { "Authorization": "Bearer " + token }
-                });
-
-                if (!res.ok) throw new Error("Błąd serwera: " + res.status);
-
+                const res = await fetch(`/api/field/getScansHistory/${fieldId}`, { headers: { "Authorization": "Bearer " + token } });
                 const scans = await res.json();
                 tbody.innerHTML = "";
 
-                if (scans.length === 0) {
-                    tbody.innerHTML = "<tr><td colspan='2'>Brak skanów dla tego pola</td></tr>";
-                } else {
-                    scans.forEach(s => {
-                        const tr = document.createElement("tr");
-                        tr.innerHTML = `
-                                    <td>${s.id}</td>
-                                    <td>${new Date(s.scanDate).toLocaleString()}</td>
-                                    <td>
-                                        <button class="btn-preview-photo">Zdjęcie</button>
-                                        <button class="btn-preview-ndvi">NDVI</button>
-                                    </td>
-                                    <td>
-                                        <i class="fa-solid fa-trash delete-scan" style="cursor:pointer;color:red;"></i>
-                                    </td>
-                                `;
-                        tbody.appendChild(tr);
+                if (scans.length === 0) tbody.innerHTML = "<tr><td colspan='4'>Brak historii</td></tr>";
 
-                        // Podgląd zdjęcia
-                        tr.querySelector(".btn-preview-photo").addEventListener("click", () => {
-                            showRgbScan(s.id, geojson);
-                        });
+                scans.forEach(s => {
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
+                        <td>${s.id}</td>
+                        <td>${new Date(s.date).toLocaleDateString()}</td>
+                        <td>
+                            <button class="btn-preview-photo">Zdjęcie</button>
+                            <button class="btn-preview-ndvi">NDVI</button>
+                        </td>
+                        <td><i class="fa-solid fa-trash delete-scan" style="cursor:pointer;color:red;"></i></td>
+                    `;
+                    tbody.appendChild(tr);
 
-                        // Podgląd NDVI
-                        tr.querySelector(".btn-preview-ndvi").addEventListener("click", () => {
-                            showNdviScan(s.id, geojson);
-                        });
+                    tr.querySelector(".btn-preview-photo").addEventListener("click", () => showRgbScan(s.id));
+                    tr.querySelector(".btn-preview-ndvi").addEventListener("click", () => showNdviScan(s.id));
 
-                        // Usunięcie skanu
-                        tr.querySelector(".delete-scan").addEventListener("click", async () => {
-                            if (!confirm("Czy na pewno chcesz usunąć ten skan?")) return;
-
-                            try {
-                                const res = await fetch(`/api/field/deleteScan/${s.id}`, {
-                                    method: "DELETE",
-                                    headers: { "Authorization": "Bearer " + token }
-                                });
-
-                                if (!res.ok) throw new Error("Błąd przy usuwaniu skanu");
-
-                                // Usuń wiersz z tabeli po sukcesie
-                                tr.remove();
-                                alert("Skan został usunięty ✅");
-                            } catch (err) {
-                                alert("❌ " + err.message);
-                            }
-                        });
+                    // Logika usuwania (skrócona)
+                    tr.querySelector(".delete-scan").addEventListener("click", async () => {
+                        if (!confirm("Usunąć skan?")) return;
+                        await fetch(`/api/field/deleteScan/${s.id}`, { method: "DELETE", headers: { "Authorization": "Bearer " + token } });
+                        tr.remove();
                     });
-                }
+                });
             } catch (err) {
-                tbody.innerHTML = `<tr><td colspan='2' style='color:red;'>${err.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan='4'>Błąd: ${err.message}</td></tr>`;
+            }
+        });
+
+        async function showRgbScan(scanId) {
+            try {
+                const res = await fetch(`/api/field/imageById/${scanId}`, {
+                    method: "POST",
+                    headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+                    body: JSON.stringify({ geojson })
+                });
+                if (!res.ok) throw new Error("Błąd pobierania zdjęcia");
+
+                const blob = await res.blob();
+                document.getElementById("rgbImage").src = URL.createObjectURL(blob);
+                document.getElementById("rgbModal").style.display = "block";
+            } catch (e) { alert(e.message); }
+        }
+
+        // =========================================================
+        // 7. NDVI I KLASTERYZACJA (GŁÓWNA LOGIKA)
+        // =========================================================
+
+        // Wyświetlanie NDVI (najnowsze lub z historii)
+        // Jeśli scanId nie podane -> ładuje najnowsze
+        async function showNdviScan(scanId = null) {
+            const modal = document.getElementById("ndviModal");
+            const img = document.getElementById("ndviImage");
+
+            // Reset widoku
+            img.src = "";
+            img.alt = "Ładowanie...";
+            modal.style.display = "block";
+            if (colorbar) colorbar.style.display = 'block';
+            if (legendImage) legendImage.style.display = 'none';
+            updateColorbar();
+
+            try {
+                let data = null;
+
+                // SCENARIUSZ A: Konkretny skan z historii
+                if (scanId) {
+                    // Sprawdź czy mamy to w cache
+                    if (ndviDataCache && ndviDataCache.scanId === scanId) {
+                        console.log("Używam cache dla skanu", scanId);
+                        data = { ndvi: ndviDataCache, fieldBbox: imageBbox };
+                    } else {
+                        console.log("Pobieram NDVI dla skanu", scanId);
+                        const res = await fetch(`/api/field/NDVIDataById/${scanId}`, {
+                            headers: { "Authorization": "Bearer " + token }
+                        });
+                        if (!res.ok) throw new Error("Błąd pobierania danych NDVI");
+                        data = await res.json();
+
+                        // Aktualizujemy globalny cache i oznaczamy ID skanu
+                        ndviDataCache = data.ndvi;
+                        ndviDataCache.scanId = scanId;
+                        imageBbox = data.fieldBbox;
+                    }
+                }
+                // SCENARIUSZ B: Najnowsze NDVI (Przycisk "Analiza NDVI")
+                else {
+                    if (ndviDataCache && !ndviDataCache.scanId) { // cache bez scanId to "latest"
+                        console.log("Używam cache dla latest");
+                        data = { ndvi: ndviDataCache, fieldBbox: imageBbox };
+                    } else {
+                        console.log("Pobieram najnowsze NDVI...");
+                        const res = await fetch(`/api/field/latestNDVIData/${fieldId}`, {
+                            headers: { "Authorization": "Bearer " + token }
+                        });
+                        if (res.status === 204) { img.alt = "Brak danych"; return; }
+                        if (!res.ok) throw new Error("Błąd pobierania");
+                        data = await res.json();
+
+                        ndviDataCache = data.ndvi;
+                        imageBbox = data.fieldBbox;
+                    }
+                }
+
+                // Wizualizacja
+                const vizRes = await fetch(`/api/field/visualize`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+                    body: JSON.stringify({
+                        ndviMatrix: ndviDataCache,
+                        fieldBbox: geojson,
+                        bbox: imageBbox
+                    })
+                });
+
+                if (!vizRes.ok) throw new Error("Błąd wizualizacji");
+                const blob = await vizRes.blob();
+                img.src = URL.createObjectURL(blob);
+                img.alt = "Mapa NDVI";
+
+            } catch (err) {
+                console.error(err);
+                img.alt = "Błąd: " + err.message;
+            }
+        }
+
+        // Obsługa przycisku "Analiza NDVI" (Główne menu)
+        document.querySelector("#ndviBtn").addEventListener("click", () => showNdviScan(null));
+
+        // Obsługa przycisku "Grupuj" (Klasteryzacja)
+        clusterButton.addEventListener("click", async () => {
+            console.group("🔍 DIAGNOSTYKA: Kliknięto 'Grupuj'");
+
+            // 1. Walidacja zmiennych
+            console.log("1. Sprawdzanie stanu aplikacji:");
+            console.log("   - ndviDataCache:", ndviDataCache ? "✅ Jest (rozmiar: " + ndviDataCache.length + ")" : "❌ BRAK");
+            console.log("   - selectedPlantStateId:", selectedPlantStateId);
+            console.log("   - imageBbox:", imageBbox);
+            console.log("   - geojson:", geojson ? "✅ Jest" : "❌ BRAK");
+
+            if (!ndviDataCache || ndviDataCache.length === 0) {
+                console.error("❌ Błąd: Brak danych NDVI w pamięci.");
+                alert("Błąd: Brak danych NDVI. Najpierw wyświetl mapę.");
+                console.groupEnd();
+                return;
+            }
+            if (!selectedPlantStateId || selectedPlantStateId === 0) {
+                console.error("❌ Błąd: Brak ID cyklu.");
+                alert("Nie można przeprowadzić analizy.\nPowód: Nie określono cyklu rośliny.");
+                console.groupEnd();
+                return;
             }
 
-            modal.style.display = "block";
-        });
+            try {
+                const request = {
+                    cycleId: selectedPlantStateId,
+                    ndvi: ndviDataCache,
+                    fieldGeojson: geojson,
+                    imageBbox: imageBbox,
+                    darkMode: savedTheme === 'dark'
+                };
 
-        // Zamknięcie modala
-        document.querySelectorAll(".modal").forEach(modal => {
-            modal.querySelectorAll(".btn-cancel, .btn-close").forEach(btn => {
-                btn.addEventListener("click", () => {
-                    modal.style.display = "none";
+                console.log("2. Wysyłanie requestu do API:", request);
 
-                    // 🔹 DODAJEMY RESET W ŚRODKU FUNKCJI
-                    const colorbar = document.getElementById("colorbar");
-                    const legendImage = document.getElementById("legendImage");
-
-                    if (colorbar) colorbar.style.display = 'block';
-                    if (legendImage) legendImage.style.display = 'none';
+                const response = await fetch(`/api/field/group/${fieldId}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+                    body: JSON.stringify(request)
                 });
-            });
 
-            window.addEventListener("click", (event) => {
-                if (event.target === modal) {
-                    modal.style.display = "none";
+                console.log("3. Status HTTP odpowiedzi:", response.status);
 
-                    // 🔹 RÓWNIEŻ RESET PRZY KLIKNIĘCIU W TŁO
-                    const colorbar = document.getElementById("colorbar");
-                    const legendImage = document.getElementById("legendImage");
-
-                    if (colorbar) colorbar.style.display = 'block';
-                    if (legendImage) legendImage.style.display = 'none';
+                if (!response.ok) {
+                    const txt = await response.text();
+                    throw new Error(txt);
                 }
-            });
+
+                const result = await response.json();
+
+                // 🛑 KLUCZOWY MOMENT: Sprawdzamy co dokładnie przyszło z serwera
+                console.log("4. Otrzymany JSON z backendu (klucze):", Object.keys(result));
+                console.log("   - mainImageBase64 (długość):", result.mainImageBase64 ? result.mainImageBase64.length : "undefined");
+                console.log("   - legendBase64 (długość):", result.legendBase64 ? result.legendBase64.length : "undefined");
+                console.log("   - mainImage (stary format?):", result.mainImage ? "Tak" : "Nie");
+
+                // Obsługa różnych nazw (MainImageBase64 vs mainImage)
+                // Backend w C# record zwraca PascalCase, ale JSON serializer w .NET domyślnie robi camelCase
+                const mainImgData = result.mainImageBase64 || result.mainImage;
+                const legImgData = result.legendBase64 || result.legend;
+
+                if (mainImgData) {
+                    console.log("5. Podmieniam źródło obrazu mapy...");
+                    ndviImage.src = `data:image/png;base64,${mainImgData}`;
+                } else {
+                    console.warn("⚠️ Ostrzeżenie: Brak danych obrazu w odpowiedzi!");
+                }
+
+                // Przełączanie widoczności legendy
+                console.log("6. Aktualizacja UI legendy...");
+                if (colorbar) {
+                    console.log("   - Ukrywam stary pasek (colorbar)");
+                    colorbar.style.display = 'none';
+                } else {
+                    console.error("❌ Nie znaleziono elementu #colorbar w DOM");
+                }
+
+                if (legendImage) {
+                    console.log("   - Pokazuję nową legendę");
+                    legendImage.style.display = 'block';
+                    if (legImgData) {
+                        legendImage.src = `data:image/png;base64,${legImgData}`;
+                    } else {
+                        console.warn("⚠️ Ostrzeżenie: Brak danych legendy w odpowiedzi!");
+                    }
+                } else {
+                    console.error("❌ Nie znaleziono elementu #legendImage w DOM");
+                }
+
+                console.log("✅ Proces zakończony sukcesem!");
+
+            } catch (err) {
+                console.error("❌ BŁĄD KRYTYCZNY:", err);
+                alert("Błąd analizy: " + err.message);
+            } finally {
+                console.groupEnd();
+            }
         });
 
-        // Obsługa przycisku importu GeoTIFF
-        document.querySelector("#importBtn").addEventListener("click", () => {
-            document.querySelector("#tiffInput").click();
-        });
+        // =========================================================
+        // 8. IMPORT NOWEGO SKANU
+        // =========================================================
 
         const zipInput = document.querySelector("#tiffInput");
         const dateModal = document.getElementById("scanDateModal");
         const scanDateInput = document.getElementById("scanDateInput");
+        let selectedZipFile = null;
 
-        let selectedZipFile;
-        let selectedScanDate;
+        document.querySelector("#importBtn").addEventListener("click", () => zipInput.click());
 
         zipInput.addEventListener("change", (e) => {
-            const files = e.target.files;
-            if (!files || files.length === 0) return;
-
-            selectedZipFile = files[0];
-            dateModal.style.display = "block"; // pokaż modal z datą
+            if (e.target.files.length > 0) {
+                selectedZipFile = e.target.files[0];
+                dateModal.style.display = "block";
+            }
         });
 
-        // Obsługa zapisania daty
         document.querySelector("#dateForm").addEventListener("submit", async (e) => {
             e.preventDefault();
-            selectedScanDate = scanDateInput.value;
+            const dateVal = scanDateInput.value;
             dateModal.style.display = "none";
 
-            if (!selectedZipFile || !selectedScanDate) return;
+            if (!selectedZipFile || !dateVal) return;
 
-            // Utwórz obiekt DTO
             const formData = new FormData();
-            formData.append("date", selectedScanDate);
+            formData.append("date", dateVal);
             formData.append("zip", selectedZipFile);
             formData.append("geojson", geojson);
-
 
             try {
                 const res = await fetch(`/api/field/uploadScan/${fieldId}`, {
@@ -598,380 +805,45 @@
 
                 if (!res.ok) {
                     const msg = await res.text();
-                    throw new Error("Błąd podczas importu: " + msg);
+                    throw new Error(msg);
                 }
-
-                const result = await res.json();
-
-
-                //if (result.success) {
-                alert(`✅ Skan zapisany pod datą ${selectedScanDate}`);
-                //} else {
-                //    alert("❌ Błąd podczas zapisu skanu");
-                //}
-
-                // Opcjonalnie: odśwież podgląd
-                await loadLatestScan();
+                alert(`✅ Skan zapisany!`);
+                loadLatestScan(); // Odśwież widok
             } catch (err) {
                 alert("❌ Błąd: " + err.message);
             } finally {
                 zipInput.value = "";
                 selectedZipFile = null;
-                selectedScanDate = null;
             }
         });
 
-        // Zamknięcie modala przy kliknięciu "Anuluj"
-        document.querySelectorAll(".btn-cancel").forEach(btn => {
-            btn.addEventListener("click", () => {
-                dateModal.style.display = "none";
-                zipInput.value = "";
-                selectedZipFile = null;
-            });
-        })
+        // =========================================================
+        // 9. NARZĘDZIA UI (ZAMYKANIE MODALI, COLORBAR)
+        // =========================================================
 
-        // Obsługa przycisku "Analiza NDVI"
-        //document.querySelector("#ndviBtn").addEventListener("click", async () => {
-        //    const modal = document.getElementById("ndviModal");
-        //    const img = document.getElementById("ndviImage");
-        //    img.src = "";
-        //    img.alt = "Ładowanie obrazu...";
-        //    modal.style.display = "block";
-
-        //    try {
-        //        const res = await fetch(`/api/field/latestNDVI/${fieldId}`, {
-        //            headers: { "Authorization": "Bearer " + token }
-        //        });
-
-        //        if (res.status === 204) {
-        //            img.alt = "Brak danych NDVI";
-        //            img.src = "";
-        //        } else if (!res.ok) {
-        //            throw new Error("Błąd serwera: " + res.status);
-        //        } else {
-        //            const blob = await res.blob();
-        //            const url = URL.createObjectURL(blob);
-        //            img.src = url;
-        //            img.alt = "Mapa NDVI pola";
-        //        }
-
-        //        modal.style.display = "block";
-        //    } catch (err) {
-        //        img.alt = "❌ Nie udało się pobrać obrazu NDVI";
-        //        console.error(err);
-        //    }
-        //});
-
-        let ndviDataCache = null; // globalny cache danych NDVI (ndvi + fieldBbox)
-
-        document.querySelector("#ndviBtn").addEventListener("click", async () => {
-            const modal = document.getElementById("ndviModal");
-            const img = document.getElementById("ndviImage");
-            img.src = "";
-            img.alt = "Ładowanie obrazu...";
-            modal.style.display = "block";
-            updateColorbar();
-
-            try {
-                // 1️⃣ Jeżeli dane już są w pamięci – nie pobieraj ponownie
-                if (!ndviDataCache) {
-                    console.log("📥 Pobieram dane NDVI z backendu...");
-                    const ndviResponse = await fetch(`/api/field/latestNDVIData/${fieldId}`, {
-                        headers: { "Authorization": "Bearer " + token }
-                    });
-
-                    if (ndviResponse.status === 204) {
-                        img.alt = "Brak danych NDVI";
-                        return;
-                    }
-                    if (!ndviResponse.ok) {
-                        throw new Error("Błąd serwera przy pobieraniu NDVI: " + ndviResponse.status);
-                    }
-
-                    const res = await ndviResponse.json();
-                    ndviDataCache = res.ndvi;
-                    imageBbox = res.fieldBbox;
-                    console.log("✅ Dane NDVI zapisane w pamięci");
-                } else {
-                    console.log("💾 Używam danych NDVI z cache (bez pobierania)");
-                }
-
-                // 2️⃣ Wizualizacja NDVI
-                const visualizeResponse = await fetch(`/api/field/visualize`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": "Bearer " + token
-                    },
-                    body: JSON.stringify({
-                        ndviMatrix: ndviDataCache,
-                        fieldBbox: geojson,
-                        bbox: imageBbox
-                    })
-                });
-
-                if (!visualizeResponse.ok) {
-                    throw new Error("Błąd serwera przy generowaniu wizualizacji: " + visualizeResponse.status);
-                }
-
-                const blob = await visualizeResponse.blob();
-                const imageUrl = URL.createObjectURL(blob);
-
-                img.src = imageUrl;
-                img.alt = "Mapa NDVI pola";
-            } catch (err) {
-                img.alt = "❌ Nie udało się pobrać lub zwizualizować NDVI";
-                console.error(err);
-            }
-        });
-
-        document.addEventListener("DOMContentLoaded", function () {
-            const clusterButton = document.getElementById("clustering");
-            const ndviImage = document.getElementById("ndviImage");
-            const colorbar = document.getElementById("colorbar");
-            const legendImage = document.getElementById("legendImage");
-
-            clusterButton.addEventListener("click", async () => {
-                try {
-                    console.log("📊 Wysyłam dane NDVI do klasteryzacji...");
-
-                    const request = {
-                        cycleId: selectedPlantStateId,
-                        ndvi: ndviDataCache,
-                        fieldGeojson: geojson,
-                        imageBbox: imageBbox,
-                        darkMode: savedTheme === 'dark'
-                    };
-
-                    const response = await fetch(`/api/field/group/${fieldId}`, {
-                        method: "POST",
-                        headers: {
-                            "Authorization": "Bearer " + token,
-                            "Content-Type": "application/json"
-                        },
-                        body: JSON.stringify(request)
-                    });
-
-                    if (!response.ok) {
-                        const errText = await response.text();
-                        throw new Error(`Błąd serwera: ${response.status} – ${errText}`);
-                    }
-
-                    // 🔹 ODBIERZ JSON Z DWOMA OBRAZAMI
-                    const result = await response.json();
-
-                    // 🔹 PODMIEŃ OBRAZ GŁÓWNY
-                    ndviImage.src = `data:image/png;base64,${result.mainImage}`;
-
-                    // 🔹 ZAMIEŃ COLORBAR NA LEGENDĘ
-                    colorbar.style.display = 'none';
-                    legendImage.style.display = 'block';
-                    legendImage.src = `data:image/png;base64,${result.legend}`;
-
-                    console.log("Mapa ryzyka NDVI zaktualizowana z legendą!");
-                }
-                catch (err) {
-                    console.error(err);
-                    alert("Nie udało się przeprowadzić analizy NDVI. Sprawdź konsolę błędów.");
-                }
-            });
-        });
-
-        function formatArea(areaInM2) {
-            // Spróbuj odczytać dane użytkownika z localStorage
-            const userInfo = JSON.parse(localStorage.getItem('userInfo') || "{}");
-
-            // Jeśli brak danych — domyślnie ha
-            const surfaceType = userInfo.surface ?? 0;
-
-            let value, label;
-
-            switch (surfaceType) {
-                case 1: // ary
-                    value = (areaInM2 / 100).toFixed(2);
-                    label = 'a';
-                    break;
-                case 2: // akry
-                    value = (areaInM2 / 4046.86).toFixed(4);
-                    label = 'akr';
-                    break;
-                default: // hektary
-                    value = (areaInM2 / 10000).toFixed(4);
-                    label = 'ha';
-            }
-
-            return `${value} ${label}`;
-        }
-
-        fetch(`/api/field/getData/${fieldId}`, {
-            method: "GET",
-            headers: { "Authorization": "Bearer " + token }
-        })
-            .then(response => {
-                if (!response.ok) throw new Error("Błąd: " + response.status);
-                return response.json();
-            })
-
-            .then(data => {
-                window.lastLoadedFieldData = data;
-                document.querySelector(".title").textContent = `Pole: ${data.name}`;
-                document.querySelector("#fieldName").textContent = data.name;
-                document.querySelector("#area").textContent = formatArea(data.area);
-
-                // Tekst do widoku
-                cropEl.textContent = data.plantName;
-                stateEl.textContent = data.cycleName;
-                dateEl.textContent = data.sowingDate;
-                const [day, month, year] = data.sowingDate.split("-");
-                selectedSowingDate = `${year}-${month}-${day}`;
-                document.querySelector("#complex").textContent = data.soilComplex;
-                document.querySelector("#type").textContent = data.soilType;
-                document.querySelector("#substrate").textContent = data.soilSubstrate;
-                document.querySelector("#minBbox").textContent = data.minBbox;
-
-                // ID do pamięci / przyszłych aktualizacji
-                selectedCropId = data.crop;             // id rośliny
-                selectedPlantStateId = data.plantState; // id cyklu wzrostu
-                geojson = data.geojson;
-                loadLatestScan();
-            })
-            .catch(err => console.error("Błąd przy pobieraniu danych pola:", err));
-
-        async function showRgbScan(scanId, geojson) {
-            if (!geojson) {
-                alert("Nie można wyświetlić skanu – brak danych pola.");
-                return;
-            }
-
-            try {
-                const res = await fetch(`/api/field/imageById/${scanId}`, {
-                    method: "POST",
-                    headers: {
-                        "Authorization": "Bearer " + token,
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({ geojson })
-                });
-
-                if (!res.ok) throw new Error("Błąd pobierania zdjęcia RGB");
-
-                const blob = await res.blob();
-                const url = URL.createObjectURL(blob);
-
-                document.getElementById("rgbImage").src = url;
-                document.getElementById("rgbModal").style.display = "block";
-            } catch (err) {
-                alert("❌ " + err.message);
+        function updateColorbar() {
+            if (colorbar) {
+                const isDark = localStorage.getItem('theme') === 'dark';
+                colorbar.src = isDark ? '/css/colorbarDark.png' : '/css/colorbar.png';
             }
         }
 
-        async function showNdviScan(scanId, geojson) {
-            const modal = document.getElementById("ndviModal");
-            const img = document.getElementById("ndviImage");
-            const clusterButton = document.getElementById("clustering");
+        // Uniwersalne zamykanie modali
+        document.querySelectorAll(".modal").forEach(modal => {
+            const closeBtns = modal.querySelectorAll(".btn-close, .btn-cancel");
+            closeBtns.forEach(btn => btn.addEventListener("click", () => closeModal(modal)));
 
-            img.src = "";
-            img.alt = "Ładowanie obrazu...";
-            modal.style.display = "block";
+            window.addEventListener("click", (e) => {
+                if (e.target === modal) closeModal(modal);
+            });
+        });
 
-            try {
-                // 1️⃣ Pobierz dane NDVI dla wskazanego skanu (jeżeli nie ma w cache)
-                if (!ndviDataCache || ndviDataCache.scanId !== scanId) {
-                    console.log("📥 Pobieram dane NDVI dla skanu " + scanId);
-
-                    const ndviResponse = await fetch(`/api/field/NDVIDataById/${scanId}`, {
-                        method: "GET",
-                        headers: {
-                            "Authorization": "Bearer " + token,
-                            "Content-Type": "application/json"
-                        },
-                    });
-
-                    if (!ndviResponse.ok) {
-                        throw new Error("Błąd serwera przy pobieraniu NDVI: " + ndviResponse.status);
-                    }
-                    console.log(ndviResponse);
-                    const res = await ndviResponse.json();
-                    ndviDataCache = res.ndvi; // zapisz do cache
-                    imageBbox = res.fieldBbox;
-                    console.log("✅ Dane NDVI zapisane w pamięci");
-                } else {
-                    console.log("💾 Używam danych NDVI z cache");
-                }
-
-                // 2️⃣ Wyświetl wizualizację NDVI
-                const visualizeResponse = await fetch(`/api/field/visualize`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": "Bearer " + token
-                    },
-                    body: JSON.stringify({
-                        ndviMatrix: ndviDataCache,
-                        fieldBbox: geojson,
-                        bbox: imageBbox
-                    })
-                });
-
-                if (!visualizeResponse.ok) {
-                    throw new Error("Błąd serwera przy generowaniu wizualizacji NDVI: " + visualizeResponse.status);
-                }
-
-                const blob = await visualizeResponse.blob();
-                const imageUrl = URL.createObjectURL(blob);
-
-                img.src = imageUrl;
-                img.alt = "Mapa NDVI pola";
-
-                // 3️⃣ Obsługa przycisku klasteryzacji
-                clusterButton.onclick = async () => {
-                    if (imageBbox == null) {
-                        alert("❌ Brak danych współrzędnych obrazu – nie można wykonać klasteryzacji.");
-                        return;
-                    }
-                    try {
-                        console.log("📊 Wysyłam dane NDVI do klasteryzacji...");
-                        console.log("kurwa")
-                        const request = {
-                            cycleId: selectedPlantStateId,
-                            ndvi: ndviDataCache,
-                            fieldGeojson: geojson,
-                            imageBbox: imageBbox,
-                            darkMode: savedTheme === 'dark'
-                        };
-
-                        console.log("DarkMode w requeście:", request.darkMode);
-                        console.log("savedTheme:", savedTheme); // dodatkowo sprawdź temat
-
-                        const response = await fetch(`/api/field/group/${scanId}`, {
-                            method: "POST",
-                            headers: {
-                                "Authorization": "Bearer " + token,
-                                "Content-Type": "application/json"
-                            },
-                            body: JSON.stringify(request)
-                        });
-
-                        if (!response.ok) {
-                            const errText = await response.text();
-                            throw new Error(`Błąd serwera: ${response.status} – ${errText}`);
-                        }
-
-                        const clusterBlob = await response.blob();
-                        const clusterUrl = URL.createObjectURL(clusterBlob);
-
-                        img.src = clusterUrl;
-                        console.log("Mapa ryzyka NDVI zaktualizowana!");
-                    } catch (err) {
-                        console.error(err);
-                        alert("Nie udało się przeprowadzić analizy NDVI. Sprawdź konsolę błędów.");
-                    }
-                };
-
-            } catch (err) {
-                img.alt = "❌ Nie udało się pobrać lub zwizualizować NDVI";
-                console.error(err);
-                alert("❌ " + err.message);
+        function closeModal(modal) {
+            modal.style.display = "none";
+            // Reset widoku NDVI przy zamknięciu
+            if (modal.id === "ndviModal") {
+                if (colorbar) colorbar.style.display = 'block';
+                if (legendImage) legendImage.style.display = 'none';
             }
         }
 

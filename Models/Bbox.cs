@@ -1,4 +1,6 @@
-﻿namespace WebApplication1.Models
+﻿using System.Text.Json;
+
+namespace WebApplication1.Models
 {
     public class Bbox
     {
@@ -7,10 +9,7 @@
         public double MaxX { get; set; }
         public double MaxY { get; set; }
 
-        public override string ToString()
-        {
-            return $"[MinX={MinX}, MinY={MinY}, MaxX={MaxX}, MaxY={MaxY}]";
-        }
+        public override string ToString() => JsonSerializer.Serialize(this);
     }
 
 }

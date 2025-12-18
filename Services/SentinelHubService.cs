@@ -3,6 +3,7 @@ using System.Text.Json;
 
 namespace WebApplication1.Services
 {
+    [Obsolete("Ten serwis jest przestarzały. Funkcjonalność bezpośredniego pobierania skanów pól została wyłączona. ")]
     public class SentinelHubService
     {
         private readonly IConfiguration _config;

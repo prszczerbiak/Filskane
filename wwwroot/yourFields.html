@@ -61,6 +61,7 @@
                 }
 
                 const fields = await response.json();
+                console.log(fields)
                 const container = document.getElementById('fields-container');
                 container.innerHTML = '';
 
@@ -71,7 +72,7 @@
 
                     tile.addEventListener('click', () => {
                         // przekierowanie na stronę fieldDashboard z id pola w query string
-                        window.location.href = `/fieldDashboard.html?fieldId=${f.fieldId}`;
+                        window.location.href = `/fieldDashboard.html?fieldId=${f.id}`;
                     });
                     container.appendChild(tile);
                 });

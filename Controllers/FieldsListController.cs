@@ -2,27 +2,32 @@
 using Microsoft.AspNetCore.Mvc;
 using WebApplication1.Services;
 
-[ApiController]
-[Route("api/fieldsList")]
-[Authorize]
-public class FieldsController : ControllerBase
+namespace WebApplication1.Controllers
 {
-    private readonly DatabaseService _db;
-
-    public FieldsController(DatabaseService db)
+    [ApiController]
+    [Route("api/fieldsList")]
+    [Authorize]
+    public class FieldsListController : ControllerBase
     {
-        _db = db;
-    }
+        private readonly FieldsListService _fieldsListService;
 
-    [HttpGet]
-    public IActionResult GetUserFields()
-    {
-        var username = User.Identity?.Name; // pobranie nazwy użytkownika z tokenu
+        public FieldsListController(FieldsListService fieldsListService)
+        {
+            _fieldsListService = fieldsListService;
+        }
 
-        if (string.IsNullOrEmpty(username))
-            return Unauthorized("Brak użytkownika w tokenie");
+        [HttpGet]
+        public async Task<IActionResult> GetFieldsList()
+        {
+            var username = User.Identity?.Name;
 
-        var fields = _db.GetUserFields(username);
-        return Ok(fields);
+            if (string.IsNullOrEmpty(username))
+                return Unauthorized("Brak użytkownika w tokenie");
+
+            // Pobieramy lekką listę (tylko ID i Nazwa)
+            var fields = await _fieldsListService.GetFieldsListForMenuAsync(username);
+
+            return Ok(fields);
+        }
     }
 }
