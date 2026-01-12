@@ -1,4 +1,4 @@
-﻿namespace WebApplication1.Utils;
+﻿namespace Filskane.Utils;
 /// <summary>
 /// Klasa pomocnicza do klasyfikowania NDVI
 /// </summary>

@@ -1,7 +1,7 @@
 ﻿using System.Net;
 using System.Net.Mail;
 
-namespace WebApplication1.Services
+namespace Filskane.Services
 {
     /// <summary>
     /// Serwis infrastrukturalny odpowiedzialny za wysyłkę wiadomości e-mail (SMTP).

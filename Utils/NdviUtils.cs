@@ -1,7 +1,7 @@
 ﻿using OSGeo.GDAL;
 using System;
 
-namespace WebApplication1.Utils;
+namespace Filskane.Utils;
 /// <summary>
 /// Klasa pomocnicza dotycząca NDVI
 /// </summary>

@@ -1,6 +1,6 @@
 ﻿using Isopoh.Cryptography.Argon2;
 
-namespace WebApplication1.Services;
+namespace Filskane.Services;
 
 /// <summary>
 /// Serwis implementujący mechanizm haszowania haseł przy użyciu algorytmu Argon2.

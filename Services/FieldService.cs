@@ -1,7 +1,7 @@
-﻿using WebApplication1.Models;
-using WebApplication1.DAL;
+﻿using Filskane.Models;
+using Filskane.DAL;
 
-namespace WebApplication1.Services;
+namespace Filskane.Services;
 
 /// <summary>
 /// Serwis biznesowy pośredniczący w operacjach na polach oraz powiązanych z nimi skanach.

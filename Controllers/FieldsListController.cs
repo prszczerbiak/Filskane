@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using WebApplication1.Services;
+using Filskane.Services;
 
-namespace WebApplication1.Controllers;
+namespace Filskane.Controllers;
 
 /// <summary>
 /// Kontroler obsługujący pobieranie listy pól do menu nawigacyjnego aplikacji.

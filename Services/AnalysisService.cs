@@ -1,11 +1,11 @@
 ﻿using OSGeo.GDAL;
 using System.IO.Compression;
 using System.Runtime.InteropServices;
-using WebApplication1.Models;
-using WebApplication1.Utils;
-using WebApplication1.DAL;
+using Filskane.Models;
+using Filskane.Utils;
+using Filskane.DAL;
 
-namespace WebApplication1.Services;
+namespace Filskane.Services;
 
 /// <summary>
 /// Serwis odpowiedzialny za zaawansowaną analizę obrazów satelitarnych, obliczanie wskaźników (NDVI) i przetwarzanie plików rastrowych.

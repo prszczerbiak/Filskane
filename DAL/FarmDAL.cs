@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Oracle.ManagedDataAccess.Client;
 
-namespace WebApplication1.DAL;
+namespace Filskane.DAL;
 /// <summary>
 /// Warstwa dostępu do danych odpowiedzialna za zarządzanie informacjami o gospodarstwie (lokalizacja).
 /// </summary>

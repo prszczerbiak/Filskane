@@ -1,6 +1,6 @@
-@WebApplication1_HostAddress = http://localhost:5234
+@Filskane_HostAddress = http://localhost:5234
 
-GET {{WebApplication1_HostAddress}}/weatherforecast/
+GET {{Filskane_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###

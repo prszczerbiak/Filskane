@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Oracle.ManagedDataAccess.Client;
 
-namespace WebApplication1.DAL
+namespace Filskane.DAL
 {
     /// <summary>
     /// Abstrakcyjna klasa bazowa dla wszystkich komponentów warstwy dostępu do danych (DAL).

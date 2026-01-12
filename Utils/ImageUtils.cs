@@ -4,9 +4,9 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Drawing.Processing;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
-using WebApplication1.Models; 
+using Filskane.Models; 
 
-namespace WebApplication1.Utils;
+namespace Filskane.Utils;
 
 /// <summary>
 /// Klasa pomocnicza w operacjach na obrazie png/tiff

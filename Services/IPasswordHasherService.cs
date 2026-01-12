@@ -1,4 +1,4 @@
-﻿namespace WebApplication1.Services
+﻿namespace Filskane.Services
 {
     /// <summary>
     /// Interfejs definiujący kontrakt dla serwisów haszowania haseł.

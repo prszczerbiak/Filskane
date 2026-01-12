@@ -1,4 +1,4 @@
-﻿namespace WebApplication1.Models;
+﻿namespace Filskane.Models;
 
 /// <summary>
 /// Żądanie zmiany imienia użytkownika.

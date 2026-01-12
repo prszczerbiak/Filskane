@@ -2,10 +2,10 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using WebApplication1.DAL;
-using WebApplication1.Models;
+using Filskane.DAL;
+using Filskane.Models;
 
-namespace WebApplication1.Services;
+namespace Filskane.Services;
 
 /// <summary>
 /// Serwis biznesowy odpowiedzialny za procesy uwierzytelniania, rejestracji oraz zarządzania sesją użytkownika (JWT).

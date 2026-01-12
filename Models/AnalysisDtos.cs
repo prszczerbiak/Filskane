@@ -2,7 +2,7 @@
 using System.Text.Json.Serialization;
 using OSGeo.GDAL;
 
-namespace WebApplication1.Models
+namespace Filskane.Models
 {
     /// <summary>
     /// Szczegółowe dane o polu, zawierające informacje o glebie, aktualnej uprawie i geometrii.

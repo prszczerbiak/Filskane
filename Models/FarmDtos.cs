@@ -1,4 +1,4 @@
-﻿namespace WebApplication1.Models
+﻿namespace Filskane.Models
 {
     /// <summary>
     /// Model danych wymagany do zapisania nowego pola w systemie.

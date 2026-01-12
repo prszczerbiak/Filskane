@@ -1,6 +1,6 @@
 ﻿using ScottPlot;
 
-namespace WebApplication1.Utils;
+namespace Filskane.Utils;
 /// <summary>
 /// Klasa pomocnicza korzystająca z narzędzi do rysowania wykresów
 /// </summary>

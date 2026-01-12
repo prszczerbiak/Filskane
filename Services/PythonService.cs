@@ -1,8 +1,8 @@
 ﻿using Python.Runtime;
 using System.Text.Json;
-using WebApplication1.Models;
+using Filskane.Models;
 
-namespace WebApplication1.Services;
+namespace Filskane.Services;
 
 /// <summary>
 /// Serwis integrujący aplikację .NET z silnikiem Python (Python.NET).

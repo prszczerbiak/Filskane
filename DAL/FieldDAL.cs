@@ -2,10 +2,10 @@
 using System.Text;
 using Oracle.ManagedDataAccess.Client;
 using Oracle.ManagedDataAccess.Types;
-using WebApplication1.Models;
-using WebApplication1.Utils;
+using Filskane.Models;
+using Filskane.Utils;
 
-namespace WebApplication1.DAL;
+namespace Filskane.DAL;
 /// <summary>
 /// Warstwa dostępu do danych odpowiedzialna za operacje na polach uprawnych (CRUD, słowniki, przypisywanie upraw).
 /// </summary>

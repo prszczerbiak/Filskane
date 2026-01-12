@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace WebApplication1.Models;
+namespace Filskane.Models;
 
 /// <summary>
 /// Model danych przesyłany podczas próby logowania.

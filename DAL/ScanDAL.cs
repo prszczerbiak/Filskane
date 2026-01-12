@@ -2,9 +2,9 @@
 using Microsoft.Extensions.Configuration;
 using Oracle.ManagedDataAccess.Client;
 using Oracle.ManagedDataAccess.Types;
-using WebApplication1.Models;
+using Filskane.Models;
 
-namespace WebApplication1.DAL;
+namespace Filskane.DAL;
 /// <summary>
 /// Warstwa dostępu do danych odpowiedzialna za operacje na skanach satelitarnych (GeoRaster/LOB).
 /// </summary>

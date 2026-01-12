@@ -1,7 +1,7 @@
 ﻿using Oracle.ManagedDataAccess.Client;
-using WebApplication1.Models;
+using Filskane.Models;
 
-namespace WebApplication1.DAL;
+namespace Filskane.DAL;
 /// <summary>
 /// Warstwa dostępu do danych odpowiedzialna za pobieranie i edycję ustawień profilu użytkownika.
 /// </summary>

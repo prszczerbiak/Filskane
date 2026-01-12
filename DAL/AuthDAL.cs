@@ -1,10 +1,10 @@
 ﻿using System.Data;
 using Microsoft.Extensions.Configuration;
 using Oracle.ManagedDataAccess.Client;
-using WebApplication1.Models;
-using WebApplication1.Services;
+using Filskane.Models;
+using Filskane.Services;
 
-namespace WebApplication1.DAL
+namespace Filskane.DAL
 {
     /// <summary>
     /// Warstwa dostępu do danych dotycząca autoryzacji.

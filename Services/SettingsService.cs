@@ -1,7 +1,7 @@
-﻿using WebApplication1.DAL;
-using WebApplication1.Models;
+﻿using Filskane.DAL;
+using Filskane.Models;
 
-namespace WebApplication1.Services
+namespace Filskane.Services
 {
     /// <summary>
     /// Serwis biznesowy pośredniczący w zarządzaniu ustawieniami profilu użytkownika.

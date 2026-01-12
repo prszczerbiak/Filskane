@@ -1,8 +1,8 @@
 ﻿using System.Text.Json;
 using SixLabors.ImageSharp;
-using WebApplication1.Models;
+using Filskane.Models;
 
-namespace WebApplication1.Utils;
+namespace Filskane.Utils;
 
 /// <summary>
 /// Statyczna klasa pomocnicza do operacji na danych geoprzestrzennych (GeoJSON) 
