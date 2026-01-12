@@ -1,62 +1,96 @@
 ﻿<!DOCTYPE html>
-<html>
+<html lang="pl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Twój Profil</title>
-    <link rel="stylesheet" href="css/yourprofilestyle.css">
+    <title>Profil Użytkownika - Filskane</title>
+
+    <link rel="stylesheet" href="css/yourProfileStyle.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300..800&family=Quicksand:wght@300..700&display=swap" rel="stylesheet">
+
 </head>
 <body>
+
     <div class="content">
         <div class="menu">
-            <div class="menu-option active">Twoje dane</div>
-
-            <div class="menu-option">Personalizacja</div>
-
-            <div class="menu-option">Zaawansowane</div>
-
+            <div class="menu-option active" data-tab="tab-data">Twoje dane</div>
+            <div class="menu-option" data-tab="tab-personalization">Personalizacja</div>
+            <div class="menu-option" data-tab="tab-advanced">Zaawansowane</div>
+            <div class="menu-option return-link" onclick="window.location.href='dashboard.html'">
+                <i class="fa-solid fa-arrow-left"></i> Wróć
+            </div>
         </div>
 
         <div class="description">
 
-        </div>
+            <div id="tab-data" class="tab-content active">
+                <h2>Twoje dane</h2>
+                <form id="profileDisplayForm">
+                    <div class="form-group">
+                        <label>Imię:</label>
+                        <div class="input-with-icon">
+                            <input type="text" id="display-name" readonly>
+                            <span class="edit-icon" data-action="edit-name">✏️</span>
+                        </div>
+                    </div>
 
-    </div>
+                    <div class="form-group">
+                        <label>Email:</label>
+                        <div class="input-with-icon">
+                            <input type="email" id="display-email" readonly>
+                            <span class="edit-icon" data-action="edit-email">✏️</span>
+                        </div>
+                    </div>
 
-    <div id="changeNameModal" class="modal">
-        <div class="modal-content">
-            <h3>Wpisz nowe imię:</h3>
-            <form id="dateForm">
-                <input id="nameInput" required>
-                <div class="modal-footer">
-                    <button type="button" class="btn-close">Anuluj</button>
-                    <button type="submit" class="btn-save">Zapisz</button>
+                    <div class="form-group">
+                        <label>Telefon:</label>
+                        <div class="input-with-icon">
+                            <input type="tel" id="display-phone" readonly>
+                            <span class="edit-icon" data-action="edit-phone">✏️</span>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div id="tab-personalization" class="tab-content">
+                <h2>Personalizacja</h2>
+
+                <h3>Jednostki powierzchni:</h3>
+                <div class="unit-switch" id="unitSwitch">
+                    <div class="switch-option" data-unit="ha">ha</div>
+                    <div class="switch-option" data-unit="a">a</div>
+                    <div class="switch-option" data-unit="ac">akr</div>
+                    <div class="switch-highlight"></div>
                 </div>
-            </form>
-        </div>
-    </div>
 
-    <div id="changeEmailModal" class="modal">
-        <div class="modal-content">
-            <h3>Wpisz nowy adres email:</h3>
-            <form id="emailForm">
-                <input id="emailInput" required>
-                <div id="emailMessage" style="margin-top:5px;"></div> <!-- Wiadomość walidacji -->
-                <div class="modal-footer">
-                    <button type="button" class="btn-close">Anuluj</button>
-                    <button type="submit" class="btn-save">Zapisz</button>
+                <h3 style="margin-top: 30px;">Tryb wyświetlania:</h3>
+                <div class="theme-switch" id="themeSwitch">
+                    <div class="theme-option" data-theme="light"><i class="fa-regular fa-sun"></i></div>
+                    <div class="theme-option" data-theme="dark"><i class="fa-regular fa-moon"></i></div>
+                    <div class="theme-highlight"></div>
                 </div>
-            </form>
+            </div>
+
+            <div id="tab-advanced" class="tab-content">
+                <h2>Strefa niebezpieczna</h2>
+                <div class="danger-zone">
+                    <p>Usunięcie konta jest nieodwracalne. Wszystkie Twoje pola, skany i analizy zostaną utracone.</p>
+                    <button class="btn-delete-account" id="btnOpenDeleteModal">Usuń konto</button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div id="changeTelModal" class="modal">
+    <div id="editModal" class="modal">
         <div class="modal-content">
-            <h3>Wpisz nowy telefon:</h3>
-            <form id="telForm">
-                <input id="telInput" required placeholder="+48">
-                <div id="telMessage" style="margin-top:5px;"></div> <!-- wiadomość walidacji -->
+            <h3 id="modalTitle">Edytuj dane</h3>
+            <form id="editForm">
+                <input id="editInput" class="modal-input" required>
+                <div id="validationMessage" class="validation-msg"></div>
                 <div class="modal-footer">
                     <button type="button" class="btn-close">Anuluj</button>
                     <button type="submit" class="btn-save">Zapisz</button>
@@ -66,22 +100,25 @@
     </div>
 
     <div id="deleteAccountModal" class="modal">
-        <div class="modal-content">
-            <h3>Usunięcie konta jest nieodwracalne. Wszystkie dane zostaną utracone</h3>
+        <div class="modal-content delete-modal-content">
+            <h3 class="modal-title-danger">Potwierdź usunięcie konta</h3>
+            <p>Aby potwierdzić, wpisz swoje hasło:</p>
+
             <form id="deleteForm">
-                <input id="deleteInput" required>
+                <input type="password" id="deletePasswordInput" class="modal-input" placeholder="Twoje hasło" required>
+
                 <div class="modal-footer">
                     <button type="button" class="btn-close">Anuluj</button>
-                    <button type="submit" class="btn-delete">Usuń</button>
+                    <button type="submit" class="btn-delete-confirm">Usuń bezpowrotnie</button>
                 </div>
             </form>
         </div>
     </div>
 
     <footer>
-        <p>&copy; 2024 Moja Strona. Wszelkie prawa zastrzeżone.</p>
+        <p>&copy; 2025 Filskane. Wszelkie prawa zastrzeżone.</p>
     </footer>
 
-    <script src="js/menu.js" defer></script>
+    <script src="js/yourProfile.js"></script>
 </body>
 </html>

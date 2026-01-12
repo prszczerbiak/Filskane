@@ -1,72 +1,158 @@
-﻿
-const savedTheme = localStorage.getItem('theme') || 'light';
-if (savedTheme === 'dark') {
-    document.documentElement.classList.add('dark-theme');
-}
+﻿/**
+ * ============================================================
+ * 1. INIT: WERSJA KULOODPORNA
+ * ============================================================
+ */
+(function initThemeAndAuth() {
+    // 1. Sprawdź i WYCZYŚĆ (Nuclear Option)
+    const savedTheme = localStorage.getItem('theme');
 
-function handleUnauthorized() {
-    alert("Twoja sesja wygasła. Zaloguj się ponownie.");
-    localStorage.removeItem("token"); // usuń stary token
-    window.location.href = "index.html"; // przekierowanie do strony logowania
-}
+    // Na wszelki wypadek czyścimy body i html z klasy, żeby nie było duplikatów
+    document.documentElement.classList.remove('dark-theme');
+    if (document.body) document.body.classList.remove('dark-theme');
 
-// Sprawdzenie od razu przy ładowaniu strony
-const token = localStorage.getItem("token");
-//if (!token) {
-//    handleUnauthorized();
-//}
-
-// Interceptor dla fetch, żeby złapać 401
-const originalFetch = window.fetch;
-window.fetch = async (...args) => {
-    const response = await originalFetch(...args);
-    if (response.status === 401) {
-        handleUnauthorized(); // pokaz alert i wróć do logowania
-        throw new Error("Unauthorized");
+    // Aplikujemy tylko jeśli trzeba
+    if (savedTheme === 'dark') {
+        document.documentElement.classList.add('dark-theme');
     }
-    return response;
-};
 
+    // 2. Auth Guard
+    const token = localStorage.getItem("token");
+    const isPublicPage = window.location.pathname.includes("login.html") ||
+        window.location.pathname.includes("register.html");
 
-
-const cachedUser = localStorage.getItem("userInfo");
-
-if (cachedUser) {
-    const data = JSON.parse(cachedUser);
-    document.getElementById("welcome").innerText = `Witaj, ${data.name} 😊`;
-} else if (token) {
-    // Jeśli nie ma danych w pamięci, pobierz z API
-    fetch("/api/settings/getShortInfo", {
-        headers: { "Authorization": "Bearer " + token }
-    })
-        .then(res => {
-            if (!res.ok) throw new Error("Błąd autoryzacji");
-            return res.json();
-        })
-        .then(data => {
-            // Zapisz dane w localStorage, żeby przy następnym wejściu nie fetchować ponownie
-            localStorage.setItem("userInfo", JSON.stringify(data));
-            
-            document.getElementById("welcome").innerText = `Witaj, ${data.name} 😊`;
-        })
-        .catch(err => {
-            console.error("Nie udało się pobrać danych użytkownika:", err);
-            localStorage.removeItem("token");
-            localStorage.removeItem("userInfo");
-            window.location.href = "index.html";
-        });
-} else {
-    // Brak tokena — przekierowanie do logowania
-    window.location.href = "index.html";
-}
+    if (!token && !isPublicPage) {
+        window.location.href = "login.html";
+    }
+})();
 
 document.addEventListener("DOMContentLoaded", () => {
-    const logoutBtn = document.getElementById('logoutBtn');
+    // ==========================================
+    // 2. KONFIGURACJA
+    // ==========================================
+    const CONFIG = {
+        apiBase: "https://localhost:7273/api",
+        endpoints: { shortInfo: "/settings/getShortInfo" },
+        selectors: { welcomeMsg: "welcome", logoutBtn: "logoutBtn" }
+    };
 
-    logoutBtn?.addEventListener('click', () => {
-        console.log("Kliknięto wyloguj"); // debug
-        localStorage.removeItem('token');
+    const ui = {
+        welcome: document.getElementById(CONFIG.selectors.welcomeMsg),
+        logoutBtn: document.getElementById(CONFIG.selectors.logoutBtn)
+    };
+
+    // ==========================================
+    // 3. SYNCHRONIZACJA MOTYWU (Miotacz Ognia)
+    // ==========================================
+
+    function syncThemeSimple() {
+        const savedTheme = localStorage.getItem('theme');
+        console.log('🔄 Dashboard Theme Sync. Odczytano:', savedTheme);
+
+        // KROK 1: Usuwamy klasę ZAWSZE z obu miejsc (HTML i BODY)
+        // To eliminuje "klasy zombie" z poprzednich wersji kodu
+        document.documentElement.classList.remove('dark-theme');
+        document.body.classList.remove('dark-theme');
+
+        // KROK 2: Dodajemy TYLKO na HTML i TYLKO jeśli dark
+        if (savedTheme === 'dark') {
+            document.documentElement.classList.add('dark-theme');
+        }
+    }
+
+    // ==========================================
+    // 4. API & AUTH
+    // ==========================================
+    function handleLogout() {
+        localStorage.clear();
         sessionStorage.clear();
-        window.location.href = 'index.html';
+        window.location.href = "login.html";
+    }
+
+    async function fetchWithAuth(endpoint) {
+        const token = localStorage.getItem("token");
+        if (!token) { handleLogout(); return Promise.reject("No token"); }
+
+        const res = await fetch(`${CONFIG.apiBase}${endpoint}`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        if (res.status === 401) {
+            alert("Sesja wygasła.");
+            handleLogout();
+            throw new Error("Unauthorized");
+        }
+        return res;
+    }
+
+    // ==========================================
+    // 5. LOGIKA DANYCH
+    // ==========================================
+    async function initDashboard() {
+        // A) Najpierw wygląd (priorytet)
+        syncThemeSimple();
+
+        // B) Wyświetl imię z cache
+        const cachedUser = JSON.parse(localStorage.getItem("userInfo") || "null");
+        if (cachedUser && cachedUser.name) {
+            ui.welcome.innerText = `Witaj, ${cachedUser.name} 😊`;
+        }
+
+        // C) Pobierz dane w tle (dla imienia/jednostek), ale BEZ psucia motywu
+        try {
+            await refreshUserData();
+        } catch (err) {
+            console.error("Błąd odświeżania danych:", err);
+        }
+    }
+
+    async function refreshUserData() {
+        const res = await fetchWithAuth(CONFIG.endpoints.shortInfo);
+        if (!res.ok) throw new Error("API Error");
+
+        const data = await res.json();
+
+        // 1. Aktualizacja userInfo (dane analityczne)
+        const isDarkInt = (data.darkMode === 1 || data.isDarkMode === 1) ? 1 : 0;
+        const normalizedUser = {
+            ...data,
+            name: data.name || data.firstName,
+            darkMode: isDarkInt
+        };
+        localStorage.setItem("userInfo", JSON.stringify(normalizedUser));
+
+        // 2. UI - Powitanie
+        if (ui.welcome) {
+            ui.welcome.innerText = `Witaj, ${normalizedUser.name || 'Użytkowniku'} 😊`;
+        }
+
+        // WAŻNE: Nie ruszamy tu localStorage.setItem('theme'), 
+        // żeby nie nadpisać "wyścigu" z settings.js
+    }
+
+    // ==========================================
+    // 6. OBSŁUGA ZDARZEŃ (FIX NA COFANIE)
+    // ==========================================
+
+    window.addEventListener('pageshow', (event) => {
+        console.log('📺 PageShow Event (Powrót na stronę)');
+        syncThemeSimple();
+
+        if (event.persisted) {
+            // Jeśli z cache, możemy bezpiecznie pobrać dane w tle
+            refreshUserData();
+        }
     });
+
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'theme') {
+            console.log('💾 Wykryto zmianę w innej karcie');
+            syncThemeSimple();
+        }
+    });
+
+    if (ui.logoutBtn) ui.logoutBtn.addEventListener('click', handleLogout);
+
+    // Start
+    initDashboard();
 });

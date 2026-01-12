@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Twój Filskane</title>
+    <title>Twoje pola Filskane</title>
     <link rel="stylesheet" href="css/yourFieldsStyle.css">
 
 </head>
@@ -16,72 +16,9 @@
     </div>
 
     <footer>
-        <p>&copy; 2024 Moja Strona. Wszelkie prawa zastrzeżone.</p>
+        <p>&copy; 2025 Filskane. Wszelkie prawa zastrzeżone.</p>
     </footer>
 
-    <script>
-
-        const savedTheme = localStorage.getItem('theme') || 'light';
-        if (savedTheme === 'dark') {
-            document.documentElement.classList.add('dark-theme');
-        }
-        function handleUnauthorized() {
-            alert("Twoja sesja wygasła. Zaloguj się ponownie.");
-            localStorage.removeItem("token"); // usuń stary token
-            window.location.href = "index.html"; // przekierowanie do strony logowania
-        }
-
-        // Interceptor dla fetch, żeby złapać 401
-        const originalFetch = window.fetch;
-        window.fetch = async (...args) => {
-            const response = await originalFetch(...args);
-            if (response.status === 401) {
-                handleUnauthorized(); // pokaz alert i wróć do logowania
-                throw new Error("Unauthorized");
-            }
-            return response;
-        };
-
-        // Sprawdzenie od razu przy ładowaniu strony
-        const token = localStorage.getItem("token");
-        if (!token) {
-            handleUnauthorized();
-        }
-
-        async function loadFields() {
-            try {
-                const response = await fetch('/api/fieldsList', {
-                    headers: {
-                        'Authorization': 'Bearer ' + localStorage.getItem('token') // token JWT
-                    }
-                });
-
-                if (!response.ok) {
-                    throw new Error("Błąd pobierania pól: " + response.status);
-                }
-
-                const fields = await response.json();
-                console.log(fields)
-                const container = document.getElementById('fields-container');
-                container.innerHTML = '';
-
-                fields.forEach(f => {
-                    const tile = document.createElement('div');
-                    tile.className = 'field-tile';
-                    tile.innerHTML = `<h3>${f.name}</h3>`;
-
-                    tile.addEventListener('click', () => {
-                        // przekierowanie na stronę fieldDashboard z id pola w query string
-                        window.location.href = `/fieldDashboard.html?fieldId=${f.id}`;
-                    });
-                    container.appendChild(tile);
-                });
-            } catch (err) {
-                console.error(err);
-            }
-        }
-
-        loadFields();
-    </script>
+    <script src="js/yourFields.js"></script>
 </body>
 </html>

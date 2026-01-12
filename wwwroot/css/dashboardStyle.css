@@ -7,7 +7,9 @@
 html, body {
     margin: 0;
     padding: 0;
-    height: 100%; /* Upewnij się, że body i html mają wysokość 100% */
+    min-height: 100vh; /* Upewnij się, że body i html mają wysokość 100% */
+    display: flex;
+    flex-direction: column;
 }
 
 .content {
@@ -115,7 +117,6 @@ footer {
     color: white; /* Biały tekst */
     text-align: center; /* Wyśrodkowanie tekstu */
     padding: 15px; /* Wewnętrzny odstęp */
-    /*position: fixed; /* Przyklejenie stopki do dołu */
     bottom: 0;
     left: 0; /* Przypięcie do lewej strony */
     width: 100%; /* Pełna szerokość ekranu */

@@ -1,186 +1,231 @@
-﻿namespace WebApplication1.DAL;
-
-using System;
-using System.Data;
-using System.Threading.Tasks;
+﻿using System.Data;
 using Microsoft.Extensions.Configuration;
 using Oracle.ManagedDataAccess.Client;
-using WebApplication1.Models;   // Tutaj powinny być Twoje DTO (RegisterRequest itp.)
-using WebApplication1.Services; // Tutaj powinien być IPasswordHasherService
+using WebApplication1.Models;
+using WebApplication1.Services;
 
-public class AuthDAL : BaseDAL
+namespace WebApplication1.DAL
 {
-    private readonly IPasswordHasherService _hasher;
-
-    // Konstruktor pobiera konfigurację dla klasy bazowej oraz Hasher dla tej klasy
-    public AuthDAL(IConfiguration configuration, IPasswordHasherService hasher)
-        : base(configuration)
-    {
-        _hasher = hasher;
-    }
-
     /// <summary>
-    /// Sprawdza czy użytkownik istnieje i czy hasło jest poprawne.
+    /// Warstwa dostępu do danych dotycząca autoryzacji.
     /// </summary>
-    public async Task<bool> ValidateUserAsync(string username, string password)
+    public class AuthDAL : BaseDAL
     {
-        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
-            return false;
+        private readonly IPasswordHasherService _hasher;
+        private readonly ILogger<AuthDAL> _logger;
 
-        try
+        public AuthDAL(
+            IConfiguration configuration,
+            IPasswordHasherService hasher,
+            ILogger<AuthDAL> logger)
+            : base(configuration)
         {
-            await using var conn = CreateConnection();
-            await conn.OpenAsync();
+            _hasher = hasher;
+            _logger = logger;
+        }
 
-            string sql = @"SELECT PASSWORD_HASH 
-                           FROM USERS
-                           WHERE USERNAME = :username 
-                             AND IS_VERIFIED = 1";
-
-            await using var cmd = new OracleCommand(sql, conn);
-            cmd.Parameters.Add("username", OracleDbType.Varchar2).Value = username;
-
-            // Pobieramy hash z bazy
-            var result = await cmd.ExecuteScalarAsync();
-
-            if (result == null || result == DBNull.Value)
+        /// <summary>
+        /// Weryfikuje poprawność poświadczeń użytkownika (Login + Hasło) oraz status weryfikacji konta.
+        /// </summary>
+        /// <param name="username">Nazwa użytkownika.</param>
+        /// <param name="password">Hasło w formie jawnej.</param>
+        /// <returns>True, jeśli dane są poprawne i konto jest aktywne.</returns>
+        public async Task<bool> ValidateUserAsync(string username, string password)
+        {
+            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
                 return false;
 
-            string storedHash = result.ToString();
+            const string sql = @"
+                SELECT PASSWORD_HASH 
+                FROM USERS 
+                WHERE USERNAME = :username 
+                  AND IS_VERIFIED = 1";
 
-            // Weryfikacja hasła przez serwis zewnętrzny
-            return _hasher.Verify(password, storedHash);
-        }
-        catch
-        {
-            // W przypadku błędu bazy danych bezpieczniej jest zwrócić false
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Rejestruje nowego użytkownika w bazie danych.
-    /// </summary>
-    public async Task<bool> RegisterUserAsync(RegisterRequest request, string token)
-    {
-        // Hashowanie hasła przed zapisem
-        string hashedPassword = _hasher.Hash(request.Password);
-
-        try
-        {
-            await using var conn = CreateConnection();
-            await conn.OpenAsync();
-
-            string sql = @"INSERT INTO USERS (FIRST_NAME, USERNAME, EMAIL, PASSWORD_HASH, VERIFICATION_TOKEN)
-                           VALUES (:name, :username, :email, :passwordhash, :verificationToken)";
-
-            await using var cmd = new OracleCommand(sql, conn);
-
-            // Parametryzacja zapytania
-            cmd.Parameters.Add("name", OracleDbType.Varchar2).Value = request.Name;
-            cmd.Parameters.Add("username", OracleDbType.Varchar2).Value = request.Username;
-            cmd.Parameters.Add("email", OracleDbType.Varchar2).Value = request.Email;
-            cmd.Parameters.Add("passwordhash", OracleDbType.Varchar2).Value = hashedPassword;
-            cmd.Parameters.Add("verificationToken", OracleDbType.Varchar2).Value = token;
-
-            int rows = await cmd.ExecuteNonQueryAsync();
-            return rows > 0;
-        }
-        catch (OracleException ex)
-        {
-            // ORA-00001: Naruszenie unikalności (zajęty login lub email)
-            if (ex.Number == 1)
+            try
             {
+                await using var conn = CreateConnection();
+                await conn.OpenAsync();
+
+                await using var cmd = new OracleCommand(sql, conn);
+                cmd.Parameters.Add("username", OracleDbType.Varchar2).Value = username;
+
+                var result = await cmd.ExecuteScalarAsync();
+
+                if (result == null || result == DBNull.Value)
+                {
+                    _logger.LogDebug("Nieudane logowanie: nie znaleziono aktywnego użytkownika {Username}", username);
+                    return false;
+                }
+
+                string storedHash = result.ToString()!;
+                bool isPasswordValid = _hasher.Verify(password, storedHash);
+
+                if (!isPasswordValid)
+                {
+                    _logger.LogDebug("Nieudane logowanie: błędne hasło dla użytkownika {Username}", username);
+                }
+
+                return isPasswordValid;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Błąd bazy danych podczas walidacji użytkownika {Username}", username);
                 return false;
             }
-            throw; // Inne błędy rzucamy wyżej (np. brak połączenia)
         }
-    }
 
-    /// <summary>
-    /// Weryfikuje konto użytkownika na podstawie tokena email.
-    /// </summary>
-    public async Task<bool> VerifyUserAsync(string token)
-    {
-        if (string.IsNullOrWhiteSpace(token)) return false;
-
-        try
+        /// <summary>
+        /// Rejestruje nowego użytkownika w bazie danych.
+        /// </summary>
+        /// <param name="request">Dane rejestracyjne.</param>
+        /// <param name="token">Wygenerowany token weryfikacyjny.</param>
+        /// <returns>True, jeśli utworzono rekord.</returns>
+        public async Task<bool> RegisterUserAsync(RegisterRequest request, string token)
         {
-            await using var conn = CreateConnection();
-            await conn.OpenAsync();
+            string hashedPassword = _hasher.Hash(request.Password);
 
-            // Ustawiamy IS_VERIFIED na 1 i czyścimy token, aby nie można go było użyć ponownie
-            string sql = @"UPDATE USERS 
-                           SET IS_VERIFIED = 1, VERIFICATION_TOKEN = NULL 
-                           WHERE VERIFICATION_TOKEN = :token";
+            const string sql = @"
+                INSERT INTO USERS (FIRST_NAME, USERNAME, EMAIL, PASSWORD_HASH, VERIFICATION_TOKEN)
+                VALUES (:name, :username, :email, :passwordhash, :verificationToken)";
 
-            await using var cmd = new OracleCommand(sql, conn);
-            cmd.Parameters.Add("token", OracleDbType.Varchar2).Value = token;
+            try
+            {
+                await using var conn = CreateConnection();
+                await conn.OpenAsync();
 
-            int rowsAffected = await cmd.ExecuteNonQueryAsync();
-            return rowsAffected > 0;
+                await using var cmd = new OracleCommand(sql, conn);
+
+                cmd.Parameters.Add("name", OracleDbType.Varchar2).Value = request.Name;
+                cmd.Parameters.Add("username", OracleDbType.Varchar2).Value = request.Username;
+                cmd.Parameters.Add("email", OracleDbType.Varchar2).Value = request.Email;
+                cmd.Parameters.Add("passwordhash", OracleDbType.Varchar2).Value = hashedPassword;
+                cmd.Parameters.Add("verificationToken", OracleDbType.Varchar2).Value = token;
+
+                int rows = await cmd.ExecuteNonQueryAsync();
+                return rows > 0;
+            }
+            catch (OracleException ex)
+            {
+                // ORA-00001: Naruszenie unikalności (Unique Constraint Violation)
+                if (ex.Number == 1)
+                {
+                    _logger.LogWarning("Próba rejestracji na zajęte dane (Username/Email): {Username}, {Email}", request.Username, request.Email);
+                    return false;
+                }
+
+                _logger.LogError(ex, "Krytyczny błąd Oracle podczas rejestracji użytkownika {Username}", request.Username);
+                throw;
+            }
         }
-        catch
+
+        /// <summary>
+        /// Weryfikuje konto użytkownika na podstawie tokena email i aktywuje je.
+        /// </summary>
+        /// <param name="token">Token weryfikacyjny.</param>
+        /// <returns>True, jeśli weryfikacja się powiodła.</returns>
+        public async Task<bool> VerifyUserAsync(string token)
         {
-            return false;
+            if (string.IsNullOrWhiteSpace(token)) return false;
+
+            const string sql = @"
+                UPDATE USERS 
+                SET IS_VERIFIED = 1, VERIFICATION_TOKEN = NULL 
+                WHERE VERIFICATION_TOKEN = :token";
+
+            try
+            {
+                await using var conn = CreateConnection();
+                await conn.OpenAsync();
+
+                await using var cmd = new OracleCommand(sql, conn);
+                cmd.Parameters.Add("token", OracleDbType.Varchar2).Value = token;
+
+                int rowsAffected = await cmd.ExecuteNonQueryAsync();
+
+                if (rowsAffected > 0)
+                {
+                    _logger.LogInformation("Pomyślnie zweryfikowano konto przy użyciu tokena.");
+                    return true;
+                }
+
+                _logger.LogWarning("Nieudana weryfikacja: token nie istnieje lub wygasł.");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Błąd bazy danych podczas weryfikacji tokena.");
+                return false;
+            }
         }
-    }
 
-    /// <summary>
-    /// Sprawdza, czy podany email jest już zajęty.
-    /// </summary>
-    public async Task<bool> CheckIfEmailExistsAsync(string email)
-    {
-        if (string.IsNullOrWhiteSpace(email)) return false;
-
-        try
+        /// <summary>
+        /// Sprawdza, czy podany adres e-mail jest już zarejestrowany w bazie.
+        /// </summary>
+        /// <param name="email">Adres e-mail do sprawdzenia.</param>
+        public async Task<bool> CheckIfEmailExistsAsync(string email)
         {
-            await using var conn = CreateConnection();
-            await conn.OpenAsync();
+            if (string.IsNullOrWhiteSpace(email)) return false;
 
-            string sql = "SELECT COUNT(1) FROM USERS WHERE EMAIL = :email";
+            const string sql = "SELECT COUNT(1) FROM USERS WHERE EMAIL = :email";
 
-            await using var cmd = new OracleCommand(sql, conn);
-            cmd.Parameters.Add("email", OracleDbType.Varchar2).Value = email;
+            try
+            {
+                await using var conn = CreateConnection();
+                await conn.OpenAsync();
 
-            var result = await cmd.ExecuteScalarAsync();
+                await using var cmd = new OracleCommand(sql, conn);
+                cmd.Parameters.Add("email", OracleDbType.Varchar2).Value = email;
 
-            return Convert.ToInt32(result) > 0;
+                var result = await cmd.ExecuteScalarAsync();
+                return Convert.ToInt32(result) > 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Błąd sprawdzania dostępności emaila {Email}", email);
+                return false;
+            }
         }
-        catch
+
+        /// <summary>
+        /// Trwale usuwa konto użytkownika po ponownej weryfikacji hasła.
+        /// </summary>
+        /// <param name="username">Nazwa użytkownika.</param>
+        /// <param name="password">Hasło potwierdzające.</param>
+        /// <returns>True, jeśli usunięto konto.</returns>
+        public async Task<bool> DeleteUserAccountAsync(string username, string password)
         {
-            return false;
-        }
-    }
+            // Ponowna weryfikacja tożsamości przed operacją destrukcyjną
+            bool isValid = await ValidateUserAsync(username, password);
+            if (!isValid)
+            {
+                _logger.LogWarning("Próba usunięcia konta {Username} odrzucona: nieprawidłowe hasło.", username);
+                return false;
+            }
 
-    /// <summary>
-    /// Usuwa konto użytkownika po ponownej weryfikacji hasła.
-    /// </summary>
-    public async Task<bool> DeleteUserAccountAsync(string username, string password)
-    {
-        // KROK 1: Reużywamy metody ValidateUserAsync, aby sprawdzić poprawność hasła.
-        // Dzięki temu nie powielamy logiki pobierania i porównywania hasha.
-        bool isValid = await ValidateUserAsync(username, password);
+            const string deleteSql = "DELETE FROM USERS WHERE USERNAME = :username";
 
-        if (!isValid) return false;
+            try
+            {
+                await using var conn = CreateConnection();
+                await conn.OpenAsync();
 
-        // KROK 2: Usuwanie konta
-        try
-        {
-            await using var conn = CreateConnection();
-            await conn.OpenAsync();
+                await using var cmd = new OracleCommand(deleteSql, conn);
+                cmd.Parameters.Add("username", OracleDbType.Varchar2).Value = username;
 
-            string deleteSql = "DELETE FROM USERS WHERE USERNAME = :username";
+                int rows = await cmd.ExecuteNonQueryAsync();
 
-            await using var cmd = new OracleCommand(deleteSql, conn);
-            cmd.Parameters.Add("username", OracleDbType.Varchar2).Value = username;
-
-            int rows = await cmd.ExecuteNonQueryAsync();
-            return rows > 0;
-        }
-        catch
-        {
-            return false;
+                if (rows > 0)
+                {
+                    _logger.LogInformation("Konto użytkownika {Username} zostało usunięte z bazy danych.", username);
+                    return true;
+                }
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Krytyczny błąd podczas usuwania konta {Username}", username);
+                return false;
+            }
         }
     }
 }

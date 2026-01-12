@@ -3,77 +3,117 @@ using Microsoft.AspNetCore.Mvc;
 using WebApplication1.Models;
 using WebApplication1.Services;
 
-namespace WebApplication1.Controllers
+namespace WebApplication1.Controllers;
+
+/// <summary>
+/// Kontroler odpowiedzialny za autoryzację i zarządzanie kontami użytkowników.
+/// </summary>
+[Route("api/auth")]
+[ApiController]
+public class AuthController : ControllerBase
 {
-    [Route("api/auth")]
-    [ApiController]
-    public class AuthController : ControllerBase
+    private readonly AuthService _authService;
+    private readonly ILogger<AuthController> _logger;
+
+    public AuthController(AuthService authService, ILogger<AuthController> logger)
     {
-        // Używamy AuthService zgodnie z diagramem, zamiast surowego DbService
-        private readonly AuthService _authService;
+        _authService = authService;
+        _logger = logger;
+    }
 
-        public AuthController(AuthService authService)
+    /// <summary>
+    /// Przeprowadza logowanie użytkownika.
+    /// </summary>
+    /// <param name="request">Obiekt zawierający nazwę użytkownika i hasło.</param>
+    /// <returns>Token JWT w przypadku sukcesu lub informację o błędzie.</returns>
+    [HttpPost("login")]
+    public async Task<IActionResult> LoginAsync([FromBody] LoginRequest request)
+    {
+        var result = await _authService.LoginAsync(request);
+
+        if (result.Success)
         {
-            _authService = authService;
+            return Ok(new { token = result.Token });
         }
 
-        [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginRequest request)
+        _logger.LogWarning("Nieudana próba logowania dla użytkownika: {Username}", request.Username);
+        return Unauthorized(new { message = "Nieprawidłowy login lub hasło." });
+    }
+
+    /// <summary>
+    /// Rejestruje nowego użytkownika w systemie.
+    /// </summary>
+    /// <param name="request">Dane wymagane do utworzenia konta.</param>
+    /// <returns>Potwierdzenie wysłania e-maila weryfikacyjnego.</returns>
+    /// <exception cref="Exception">Rzucany w przypadku błędu serwera lub bazy danych.</exception>
+    [HttpPost("register")]
+    public async Task<IActionResult> RegisterAsync([FromBody] RegisterRequest request)
+    {
+        try
         {
-            // Cała logika walidacji hasła i generowania tokena jest w serwisie
-            var result = await _authService.LoginAsync(request);
+            await _authService.RegisterUserAsync(request);
+            return Ok(new { message = "Użytkownik zarejestrowany. Sprawdź e-mail." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd podczas rejestracji użytkownika {Email}", request.Email);
+            return StatusCode(500, new { message = "Wystąpił błąd serwera podczas rejestracji." });
+        }
+    }
 
-            if (result.Success)
-            {
-                return Ok(new { token = result.Token });
-            }
+    /// <summary>
+    /// Sprawdza, czy podany adres e-mail istnieje już w bazie.
+    /// </summary>
+    /// <param name="request">Adres e-mail do weryfikacji.</param>
+    /// <returns>Obiekt JSON z flagą 'exists'.</returns>
+    [HttpPost("check-email")]
+    public async Task<IActionResult> CheckEmailAsync([FromBody] CheckEmailRequest request)
+    {
+        bool exists = await _authService.EmailExistsAsync(request.Email);
+        return Ok(new { exists });
+    }
 
-            return Unauthorized("Nieprawidłowy login lub hasło.");
+    /// <summary>
+    /// Weryfikuje konto na podstawie tokenu wysłanego e-mailem.
+    /// </summary>
+    /// <param name="token">Token weryfikacyjny z linku aktywacyjnego.</param>
+    /// <returns>Komunikat o powodzeniu aktywacji lub błędzie.</returns>
+    [HttpGet("verify")]
+    public async Task<IActionResult> VerifyAsync([FromQuery] string token)
+    {
+        bool success = await _authService.VerifyAccountAsync(token);
+
+        if (success)
+        {
+            return Ok(new { message = "Konto zostało pomyślnie aktywowane." });
         }
 
-        [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+        return BadRequest(new { message = "Nieprawidłowy lub wygasły token weryfikacyjny." });
+    }
+
+    /// <summary>
+    /// Trwale usuwa konto aktualnie zalogowanego użytkownika.
+    /// </summary>
+    /// <param name="req">Hasło użytkownika wymagane do potwierdzenia operacji.</param>
+    /// <returns>Status operacji usunięcia.</returns>
+    [HttpPost("deleteAccount")]
+    [Authorize]
+    public async Task<IActionResult> DeleteAccountAsync([FromBody] DeleteAccountRequest req)
+    {
+        var username = User.Identity?.Name;
+
+        if (string.IsNullOrEmpty(username))
+            return Unauthorized(new { message = "Brak autoryzacji." });
+
+        bool deleted = await _authService.DeleteAccountAsync(username, req.Password);
+
+        if (!deleted)
         {
-            try
-            {
-                // Kontroler nie wie nic o tokenach weryfikacyjnych ani mailach.
-                // Mówi tylko serwisowi: "Zarejestruj tego człowieka".
-                await _authService.RegisterUserAsync(request);
-                return Ok(new { message = "Użytkownik zarejestrowany. Sprawdź e-mail." });
-            }
-            catch (Exception ex)
-            {
-                // W produkcji nie zwracamy ex.Message użytkownikowi (security!), ale w inżynierce ujdzie
-                return StatusCode(500, new { message = "Wystąpił błąd serwera." });
-            }
+            _logger.LogWarning("Nieudana próba usunięcia konta {Username} - błędne hasło.", username);
+            return BadRequest(new { message = "Niepoprawne hasło. Konto nie zostało usunięte." });
         }
 
-        [HttpPost("check-email")]
-        public async Task<IActionResult> CheckEmail([FromBody] CheckEmailRequest request)
-        {
-            bool exists = await _authService.EmailExistsAsync(request.Email);
-            return Ok(new { exists });
-        }
-
-        [HttpGet("verify")]
-        public async Task<IActionResult> Verify([FromQuery] string token)
-        {
-            bool success = await _authService.VerifyAccountAsync(token);
-            return success ? Ok("Konto aktywowane.") : BadRequest("Błędny token.");
-        }
-
-        [HttpPost("deleteAccount")]
-        [Authorize] // To zapewnia, że User.Identity jest wypełnione
-        public async Task<IActionResult> DeleteAccount([FromBody] DeleteAccountRequest req)
-        {
-            var username = User.Identity?.Name;
-            if (string.IsNullOrEmpty(username)) return Unauthorized();
-
-            bool deleted = await _authService.DeleteAccountAsync(username, req.Password);
-
-            if (!deleted) return BadRequest(new { message = "Niepoprawne hasło." });
-
-            return Ok(new { message = "Konto usunięte." });
-        }
+        _logger.LogInformation("Konto {Username} zostało trwale usunięte.", username);
+        return Ok(new { message = "Konto zostało trwale usunięte." });
     }
 }

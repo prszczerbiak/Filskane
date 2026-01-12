@@ -3,98 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Twój Filskane</title>
+    <title>Analiza Pola - Filskane</title>
     <link rel="stylesheet" href="css/fieldDashboardStyle.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 
 </head>
 <body>
     <div class="content">
-        <h2 class="title"></h2>
+        <h2 class="title" id="pageTitle">Ładowanie danych...</h2>
 
         <div class="fieldContent">
             <div class="fieldScan">
-                <p>Data ostatniego skanu: <span id="scanDate"></span></p>
-                <img id="scanImage" alt="Skan pola" style="max-width:100%; border-radius:8px; margin-top:20px;">
+                <p>Data ostatniego skanu: <span id="scanDate">---</span></p>
+                <div class="scan-container" style="position: relative; min-height: 300px; display: flex; align-items: center; justify-content: center;">
+
+                    <div id="scanLoader" ...>Loading...</div>
+
+                    <img id="scanImage" src="" alt="Skan pola" style="display: none; max-width: 100%;" />
+
+                    <div id="noScanMsg" style="display: none; text-align: center; color: var(--text-muted);">
+                        <i class="fa-solid fa-satellite-dish fa-3x" style="margin-bottom: 15px; opacity: 0.5;"></i>
+                        <h4>Brak skanów</h4>
+                        <p>Zaimportuj pliki .zip, aby zobaczyć podgląd.</p>
+                    </div>
+
+                </div>
             </div>
+
             <div class="field">
                 <div class="actions">
-                    <button id="importBtn">Importuj pliki GeoTIFF</button>
+                    <button id="importBtn" class="btn-primary"><i class="fa-solid fa-cloud-arrow-up"></i> Importuj Skan</button>
                     <input type="file" id="tiffInput" accept=".zip,application/zip" style="display:none">
-                    <button id="ndviBtn">Analiza NDVI</button>
-                    <button id="historyBtn">Historia skanów</button>
+
+                    <button id="ndviBtn" class="btn-success"><i class="fa-solid fa-leaf"></i> Analiza NDVI</button>
+                    <button id="historyBtn" class="btn-info"><i class="fa-solid fa-clock-rotate-left"></i> Historia</button>
                 </div>
 
-                <br /><h3>Informacje:</h3><br />
-
+                <h3>Szczegóły pola:</h3><br>
                 <div class="fieldInfo">
                     <table>
                         <tr>
-                            <td><h4>Nazwa pola:</h4></td>
-                            <td><p id="fieldName" class="colConst"></p></td>
+                            <td><strong>Nazwa:</strong></td>
+                            <td><span id="fieldName">---</span></td>
                         </tr>
-
                         <tr>
-                            <td><h4>Powierzchnia:</h4></td>
-                            <td><p id="area" class="colConst"></p></td>
+                            <td><strong>Powierzchnia:</strong></td>
+                            <td><span id="area">---</span></td>
                         </tr>
-
                         <tr>
-                            <td><h4>Uprawa:</h4></td>
-                            <td><p id="crop" class="colConst"></p></td>
-                            <td>
-                                <a href="#" class="edit-btn" data-field="crop">
-                                    <i class="fa-regular fa-pen-to-square"></i>
-                                </a>
+                            <td><strong>Uprawa:</strong></td>
+                            <td><span id="crop">---</span></td>
+                            <td><a href="#" class="edit-btn" data-target="cropModal"><i class="fa-regular fa-pen-to-square"></i></a></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Faza rozwoju:</strong></td>
+                            <td><span id="state">---</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Data siewu:</strong></td>
+                            <td><span id="date">---</span></td>
+                            <td><a href="#" class="edit-btn" data-target="dateModal"><i class="fa-regular fa-pen-to-square"></i></a></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Klasa gleby:</strong></td>
+                            <td><span id="complex">---</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Typ gleby:</strong></td>
+                            <td><span id="type">---</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Podłoże (1):</strong></td>
+                            <td><span id="substrate">---</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Obszar (BBox):</strong></td>
+                            <td colspan="2">
+                                <span id="bbox" style="font-family: monospace; ">---</span>
                             </td>
-                        </tr>
-                        <tr>
-                            <td><h4>Stan:</h4></td>
-                            <td><p id="state" class="colConst"></p></td>
-
-                        </tr>
-                        <tr>
-                            <td><h4>Data obsiania:</h4></td>
-                            <td><p id="date" class="colConst"></p></td>
-                            <td>
-                                <a href="#" class="edit-btn" data-field="date">
-                                    <i class="fa-regular fa-pen-to-square"></i>
-                                </a>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td><h4>Kompleks:</h4></td>
-                            <td><p id="complex" class="colConst"></p></td>
-                        </tr>
-
-                        <tr>
-                            <td><h4>Typ gleby:</h4></td>
-                            <td><p id="type" class="colConst"></p></td>
-                        </tr>
-
-                        <tr>
-                            <td><h4>Podłoże (1):</h4></td>
-                            <td><p id="substrate" class="colConst"></p></td>
-                        </tr>
-
-                        <tr>
-                            <td><h4>Zalecane minimalne współrzędne zdjęcia:</h4></td>
-                            <td><p id="minBbox" class="colConst"></p></td>
                         </tr>
                     </table>
                 </div>
             </div>
         </div>
-
     </div>
 
     <div id="cropModal" class="modal">
         <div class="modal-content">
-            <h3>Wybierz uprawę:</h3>
-            <form id="editForm">
-                <select id="cropInput">
-                </select>
-
+            <h3>Wybierz uprawę</h3>
+            <form id="cropForm">
+                <select id="cropInput"></select>
                 <div class="modal-footer">
                     <button type="button" class="btn-cancel">Anuluj</button>
                     <button type="submit" class="btn-save">Zapisz</button>
@@ -105,10 +103,9 @@
 
     <div id="dateModal" class="modal">
         <div class="modal-content">
-            <h3>Wprowadź nową datę siewu:</h3>
-            <form id="editForm">
+            <h3>Data siewu</h3>
+            <form id="dateForm">
                 <input type="date" id="dateInput">
-
                 <div class="modal-footer">
                     <button type="button" class="btn-cancel">Anuluj</button>
                     <button type="submit" class="btn-save">Zapisz</button>
@@ -119,21 +116,17 @@
 
     <div id="historyModal" class="modal">
         <div class="historyModal-content">
-            <h3>Historia skanów</h3>
-            <table id="scanHistoryTable" border="1" style="width:100%; border-collapse: collapse;">
+            <h3>Historia Skanów</h3>
+            <table id="scanHistoryTable">
                 <thead>
                     <tr>
-                        <th>ID skanu</th>
-                        <th>Data wykonania</th>
-                        <th>Podgląd</th> <!-- nowa kolumna -->
-                        <th>Akcje</th>   <!-- nowa kolumna -->
+                        <th>Data</th>
+                        <th>Podgląd</th>
+                        <th>Akcje</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <!-- tu dynamicznie wstawimy dane -->
-                </tbody>
+                <tbody></tbody>
             </table>
-
             <div class="modal-footer">
                 <button type="button" class="btn-close">Zamknij</button>
             </div>
@@ -142,12 +135,12 @@
 
     <div id="scanDateModal" class="modal">
         <div class="modal-content">
-            <h3>Wybierz datę skanu</h3>
-            <form id="dateForm">
-                <input type="date" id="scanDateInput" required>
+            <h3>Data wykonania skanu</h3>
+            <form id="importDateForm">
+                <input type="date" id="importDateInput" required>
                 <div class="modal-footer">
                     <button type="button" class="btn-cancel">Anuluj</button>
-                    <button type="submit" class="btn-save">Zapisz</button>
+                    <button type="submit" class="btn-save">Importuj</button>
                 </div>
             </form>
         </div>
@@ -155,18 +148,15 @@
 
     <div id="ndviModal" class="modal">
         <div class="nvdiModal-content">
-            <h3>Analiza NDVI</h3>
-            <p>Wskaźnik zdrowotności roślin (NDVI) dla wybranego pola:</p>
-            <button id="clustering">Grupuj w obszary</button>
-            <div class="nvdiPicture">
-                <img id="ndviImage" alt="Mapa NDVI" style="max-width: 78%; margin: 25px auto; ">
-                <!-- COLORBAR - widoczny na początku -->
-                <img id="colorbar" alt="Colorbar NDVI"
-                     style="width:75%; margin: 0px auto; display:block;">
+            <h3>Analiza Kondycji Roślin (NDVI)</h3>
+            <div class="toolbar">
+                <button id="clusteringBtn" class="btn-warning">Analiza Ryzyka (AI)</button>
+            </div>
 
-                <!-- LEGENDA - ukryta na początku -->
-                <img id="legendImage" alt="Legenda analizy"
-                     style="width:75%; margin: 0px auto; display:none; ">
+            <div class="nvdiPicture">
+                <img id="ndviImage" alt="Mapa NDVI">
+                <img id="colorbar" src="css/colorbar.png" alt="Legenda NDVI">
+                <img id="legendImage" alt="Legenda Klastrów" style="display:none;">
             </div>
 
             <div class="modal-footer">
@@ -175,678 +165,22 @@
         </div>
     </div>
 
-    <div id="rgbModal" class="modal" style="display:none;">
+    <div id="rgbModal" class="modal">
         <div class="nvdiModal-content">
-            <h3>Podgląd obrazu RGB</h3>
-            <p>Surowy obraz pola w widoku RGB:</p>
-
-            <div class="nvdiPicture" style="text-align:center;">
-                <div id="rgbLoader" style="display:none;">⏳ Ładowanie obrazu...</div>
-                <img id="rgbImage" alt="Obraz RGB pola"
-                     style="max-width: 78%; margin: 25px auto; ">
+            <h3>Podgląd RGB</h3>
+            <div class="nvdiPicture">
+                <img id="rgbImage" alt="Obraz RGB">
             </div>
-
-            <div class="modal-footer" style="text-align:center;">
+            <div class="modal-footer">
                 <button type="button" class="btn-close">Zamknij</button>
             </div>
         </div>
     </div>
 
     <footer>
-        <p>&copy; 2024 Moja Strona. Wszelkie prawa zastrzeżone.</p>
+        <p>&copy; 2025 Filskane. Wszelkie prawa zastrzeżone.</p>
     </footer>
 
-    <script>
-        // =========================================================
-        // 1. ZMIENNE GLOBALNE I KONFIGURACJA
-        // =========================================================
-
-        // Konfiguracja motywu
-        const savedTheme = localStorage.getItem('theme') || 'light';
-        if (savedTheme === 'dark') {
-            document.documentElement.classList.add('dark-theme');
-        }
-
-        // Pobieranie parametrów URL i Tokena
-        const params = new URLSearchParams(window.location.search);
-        const fieldId = params.get("fieldId");
-        const token = localStorage.getItem("token");
-
-        // Elementy DOM (cache'ujemy je, żeby nie szukać ciągle w dokumencie)
-        const cropEl = document.querySelector("#crop");
-        const stateEl = document.querySelector("#state");
-        const dateEl = document.querySelector("#date");
-        const cropInput = document.querySelector("#cropInput");
-        const dateInput = document.querySelector("#dateInput");
-
-        const clusterButton = document.getElementById("clustering");
-        const ndviImage = document.getElementById("ndviImage");
-        const colorbar = document.getElementById("colorbar");
-        const legendImage = document.getElementById("legendImage");
-
-        // STAN APLIKACJI (Zmienne Globalne)
-        let selectedCropId = null;
-        let selectedPlantStateId = null;
-        let selectedSowingDate = null;
-        let geojson = null;
-        let imageBbox = null;
-        let ndviDataCache = null; // Tu trzymamy aktualnie wyświetlaną macierz NDVI
-
-        // =========================================================
-        // 2. UWIERZYTELNIANIE I INTERCEPTOR
-        // =========================================================
-
-        if (!token) handleUnauthorized();
-
-        function handleUnauthorized() {
-            alert("Twoja sesja wygasła. Zaloguj się ponownie.");
-            localStorage.removeItem("token");
-            window.location.href = "index.html";
-        }
-
-        const originalFetch = window.fetch;
-        window.fetch = async (...args) => {
-            const response = await originalFetch(...args);
-            if (response.status === 401) {
-                handleUnauthorized();
-                throw new Error("Unauthorized");
-            }
-            return response;
-        };
-
-        // =========================================================
-        // 3. INICJALIZACJA STRONY
-        // =========================================================
-
-        document.addEventListener("DOMContentLoaded", () => {
-            console.log("🚀 Start aplikacji...");
-            loadFieldData();      // 1. Pobierz dane o polu
-            // loadLatestScan();  // 2. Pobierz najnowszy skan (opcjonalnie, jeśli chcesz od razu)
-        });
-
-        // =========================================================
-        // 4. POBIERANIE DANYCH POLA
-        // =========================================================
-
-        function formatArea(areaInM2) {
-            const userInfo = JSON.parse(localStorage.getItem('userInfo') || "{}");
-            const surfaceType = userInfo.surface ?? 0;
-            let value, label;
-            switch (surfaceType) {
-                case 1: value = (areaInM2 / 100).toFixed(2); label = 'a'; break;
-                case 2: value = (areaInM2 / 4046.86).toFixed(4); label = 'akr'; break;
-                default: value = (areaInM2 / 10000).toFixed(4); label = 'ha';
-            }
-            return `${value} ${label}`;
-        }
-
-        function loadFieldData() {
-            fetch(`/api/field/getData/${fieldId}`, {
-                method: "GET",
-                headers: { "Authorization": "Bearer " + token }
-            })
-                .then(res => {
-                    if (!res.ok) throw new Error("Błąd: " + res.status);
-                    return res.json();
-                })
-                .then(data => {
-                    // Aktualizacja UI
-                    window.lastLoadedFieldData = data;
-                    document.querySelector(".title").textContent = `Pole: ${data.name}`;
-                    document.querySelector("#fieldName").textContent = data.name;
-                    document.querySelector("#area").textContent = formatArea(data.area);
-
-                    cropEl.textContent = data.plantName ?? "Nieuzupełnione";
-                    stateEl.textContent = data.cycleName ?? "Nieuzupełnione";
-
-                    // Obsługa daty
-                    if (data.sowingDate) {
-                        const isoDate = data.sowingDate.split('T')[0];
-                        selectedSowingDate = isoDate;
-                        const [y, m, d] = isoDate.split('-');
-                        dateEl.textContent = `${d}.${m}.${y}`;
-                    } else {
-                        selectedSowingDate = null;
-                        dateEl.textContent = "Nieuzupełnione";
-                    }
-
-                    // Gleba
-                    document.querySelector("#complex").textContent = data.soilComplex;
-                    document.querySelector("#type").textContent = data.soilType;
-                    document.querySelector("#substrate").textContent = data.soilSubstrate;
-
-                    // BBOX
-                    const bboxEl = document.querySelector("#minBbox");
-                    if (data.minBbox) {
-                        try {
-                            const bbox = JSON.parse(data.minBbox);
-                            bboxEl.innerText = `Min: [${bbox.MinX.toFixed(5)}, ${bbox.MinY.toFixed(5)}]\nMax: [${bbox.MaxX.toFixed(5)}, ${bbox.MaxY.toFixed(5)}]`;
-                        } catch (e) {
-                            bboxEl.textContent = data.minBbox;
-                        }
-                    } else {
-                        bboxEl.textContent = "Brak danych";
-                    }
-
-                    // AKTUALIZACJA ZMIENNYCH GLOBALNYCH (Kluczowe!)
-                    selectedCropId = data.cropId;
-                    selectedPlantStateId = data.plantState; // ID cyklu z bazy
-                    geojson = data.geojson;
-
-
-                    // Po załadowaniu danych pola, ładujemy skan
-                    loadLatestScan();
-                })
-                .catch(err => console.error("Błąd przy pobieraniu danych pola:", err));
-        }
-
-        async function getCycleInfo() {
-            try {
-                const res = await fetch(`/api/field/getCycle/${fieldId}`, {
-                    headers: { "Authorization": "Bearer " + token }
-                });
-
-                if (res.status === 204) {
-                    handleNoCycle();
-                    return;
-                }
-                if (!res.ok) {
-                    const txt = await res.text();
-                    throw new Error(txt);
-                }
-
-                const text = await res.text();
-                const data = text ? JSON.parse(text) : null;
-
-                if (data) {
-                    console.log("Pobrano cykl osobno:", data);
-                    // Dostosuj nazwy do swojego DTO (id/name vs cycleId/cycleName)
-                    selectedPlantStateId = data.id || data.cycleId;
-                    stateEl.textContent = data.name || data.cycleName;
-                } else {
-                    handleNoCycle();
-                }
-            } catch (err) {
-                console.error("Błąd getCycleInfo:", err);
-                stateEl.textContent = "Błąd pobierania";
-            }
-        }
-
-        function handleNoCycle() {
-            console.log("Brak cyklu.");
-            selectedPlantStateId = 0;
-            stateEl.textContent = "Nie określono (brak daty siewu)";
-        }
-
-        // =========================================================
-        // 5. EDYCJA DANYCH (MODALE)
-        // =========================================================
-
-        // Otwieranie Modala Rośliny
-        document.querySelector('.edit-btn[data-field="crop"]').addEventListener("click", (e) => {
-            e.preventDefault();
-            document.getElementById("cropModal").style.display = "block";
-            cropInput.innerHTML = ""; // Czyścimy
-
-            fetch(`/api/field/getPlantsList`, { headers: { "Authorization": "Bearer " + token } })
-                .then(res => res.json())
-                .then(plants => {
-                    plants.forEach(p => {
-                        const option = document.createElement("option");
-                        option.value = p.id;
-                        option.textContent = p.name;
-                        cropInput.appendChild(option);
-                    });
-                    if (selectedCropId) cropInput.value = selectedCropId;
-                });
-        });
-
-        // Zapis Rośliny
-        document.querySelector("#cropModal form").addEventListener("submit", (e) => {
-            e.preventDefault();
-
-            // 1. Pobieramy ID
-            const newVal = parseInt(cropInput.value);
-
-            // 2. Pobieramy NAZWĘ wybranej opcji (do wyświetlenia)
-            const selectedOption = cropInput.options[cropInput.selectedIndex];
-
-            if (newVal) {
-                selectedCropId = newVal;
-                // ✅ AKTUALIZACJA UI: Wpisujemy nazwę rośliny do elementu na stronie
-                if (selectedOption) {
-                    cropEl.textContent = selectedOption.textContent;
-                }
-            }
-
-            // 3. Wysyłamy update
-            updateField({ cropId: selectedCropId, sowingDate: selectedSowingDate });
-            document.getElementById("cropModal").style.display = "none";
-        });
-
-        // Otwieranie Modala Daty
-        document.querySelector('.edit-btn[data-field="date"]').addEventListener("click", (e) => {
-            e.preventDefault();
-            document.getElementById("dateModal").style.display = "block";
-            if (selectedSowingDate) dateInput.value = selectedSowingDate;
-        });
-
-        // Zapis Daty
-        document.querySelector("#dateModal form").addEventListener("submit", (e) => {
-            e.preventDefault();
-
-            // 1. Pobieramy wartość z inputa
-            const rawDate = dateInput.value;
-
-            if (rawDate) {
-                selectedSowingDate = rawDate;
-
-                // ✅ AKTUALIZACJA UI: Formatowanie daty YYYY-MM-DD -> DD-MM-YYYY
-                const [year, month, day] = rawDate.split("-");
-                dateEl.textContent = `${day}.${month}.${year}`;
-            } else {
-                selectedSowingDate = null;
-                dateEl.textContent = "Nieuzupełnione";
-            }
-
-            // 2. Zabezpieczenie przed utratą CropID (o którym mówiliśmy wcześniej)
-            if (!selectedCropId) {
-                console.warn("⚠️ Brak selectedCropId, próbuję pobrać z cache/inputa...");
-                // Tu można dodać logikę ratunkową, jeśli wciąż masz ten problem
-            }
-
-            // 3. Wysyłamy update
-            updateField({ cropId: selectedCropId, sowingDate: selectedSowingDate });
-            document.getElementById("dateModal").style.display = "none";
-        });
-
-        function updateField(payload) {
-            console.log("Wysyłam update:", payload);
-            fetch(`/api/field/update/${fieldId}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-                body: JSON.stringify(payload)
-            })
-                .then(async res => {
-                    if (!res.ok) {
-                        const err = await res.json();
-                        throw new Error(err.error || "Błąd zapisu");
-                    }
-                    return res.json();
-                })
-                .then(() => {
-                    alert("Zapisano zmiany!");
-                    getCycleInfo(); // Odśwież cykl
-                    // Opcjonalnie przeładuj całą stronę dla pewności
-                    // location.reload();
-                })
-                .catch(err => alert("Błąd zapisu: " + err.message));
-        }
-
-        // =========================================================
-        // 6. OBSŁUGA SKANÓW (RGB, HISTORIA)
-        // =========================================================
-
-        async function loadLatestScan() {
-            try {
-                const res = await fetch(`/api/field/latestScan/${fieldId}`, {
-                    method: "POST",
-                    headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
-                    body: JSON.stringify({ geojson })
-                });
-
-                const img = document.querySelector("#scanImage");
-                const dateLabel = document.querySelector("#scanDate"); // Pobieramy element raz
-
-                if (res.status === 204) {
-                    img.alt = "Brak obrazu";
-                    img.src = "";
-                    dateLabel.textContent = "Brak danych";
-                    return;
-                }
-                if (!res.ok) throw new Error("Błąd pobierania skanu");
-
-                const blob = await res.blob();
-                img.src = URL.createObjectURL(blob);
-                img.alt = "Obraz satelitarny";
-
-                // --- ZMIANA FORMATOWANIA DATY ---
-                const scanDateHeader = res.headers.get("X-Scan-Date");
-
-                if (scanDateHeader && scanDateHeader !== "Brak danych") {
-                    // Tworzymy obiekt daty i formatujemy go po polsku (DD.MM.YYYY)
-                    dateLabel.textContent = new Date(scanDateHeader).toLocaleDateString('pl-PL');
-                } else {
-                    dateLabel.textContent = "Nieznana";
-                }
-
-            } catch (err) {
-                console.error("Błąd skanu:", err);
-            }
-        }
-
-        // Historia Skanów
-        document.querySelector("#historyBtn").addEventListener("click", async () => {
-            const modal = document.getElementById("historyModal");
-            const tbody = modal.querySelector("#scanHistoryTable tbody");
-            tbody.innerHTML = "<tr><td colspan='4'>Ładowanie...</td></tr>";
-            modal.style.display = "block";
-
-            try {
-                const res = await fetch(`/api/field/getScansHistory/${fieldId}`, { headers: { "Authorization": "Bearer " + token } });
-                const scans = await res.json();
-                tbody.innerHTML = "";
-
-                if (scans.length === 0) tbody.innerHTML = "<tr><td colspan='4'>Brak historii</td></tr>";
-
-                scans.forEach(s => {
-                    const tr = document.createElement("tr");
-                    tr.innerHTML = `
-                        <td>${s.id}</td>
-                        <td>${new Date(s.date).toLocaleDateString()}</td>
-                        <td>
-                            <button class="btn-preview-photo">Zdjęcie</button>
-                            <button class="btn-preview-ndvi">NDVI</button>
-                        </td>
-                        <td><i class="fa-solid fa-trash delete-scan" style="cursor:pointer;color:red;"></i></td>
-                    `;
-                    tbody.appendChild(tr);
-
-                    tr.querySelector(".btn-preview-photo").addEventListener("click", () => showRgbScan(s.id));
-                    tr.querySelector(".btn-preview-ndvi").addEventListener("click", () => showNdviScan(s.id));
-
-                    // Logika usuwania (skrócona)
-                    tr.querySelector(".delete-scan").addEventListener("click", async () => {
-                        if (!confirm("Usunąć skan?")) return;
-                        await fetch(`/api/field/deleteScan/${s.id}`, { method: "DELETE", headers: { "Authorization": "Bearer " + token } });
-                        tr.remove();
-                    });
-                });
-            } catch (err) {
-                tbody.innerHTML = `<tr><td colspan='4'>Błąd: ${err.message}</td></tr>`;
-            }
-        });
-
-        async function showRgbScan(scanId) {
-            try {
-                const res = await fetch(`/api/field/imageById/${scanId}`, {
-                    method: "POST",
-                    headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
-                    body: JSON.stringify({ geojson })
-                });
-                if (!res.ok) throw new Error("Błąd pobierania zdjęcia");
-
-                const blob = await res.blob();
-                document.getElementById("rgbImage").src = URL.createObjectURL(blob);
-                document.getElementById("rgbModal").style.display = "block";
-            } catch (e) { alert(e.message); }
-        }
-
-        // =========================================================
-        // 7. NDVI I KLASTERYZACJA (GŁÓWNA LOGIKA)
-        // =========================================================
-
-        // Wyświetlanie NDVI (najnowsze lub z historii)
-        // Jeśli scanId nie podane -> ładuje najnowsze
-        async function showNdviScan(scanId = null) {
-            const modal = document.getElementById("ndviModal");
-            const img = document.getElementById("ndviImage");
-
-            // Reset widoku
-            img.src = "";
-            img.alt = "Ładowanie...";
-            modal.style.display = "block";
-            if (colorbar) colorbar.style.display = 'block';
-            if (legendImage) legendImage.style.display = 'none';
-            updateColorbar();
-
-            try {
-                let data = null;
-
-                // SCENARIUSZ A: Konkretny skan z historii
-                if (scanId) {
-                    // Sprawdź czy mamy to w cache
-                    if (ndviDataCache && ndviDataCache.scanId === scanId) {
-                        console.log("Używam cache dla skanu", scanId);
-                        data = { ndvi: ndviDataCache, fieldBbox: imageBbox };
-                    } else {
-                        console.log("Pobieram NDVI dla skanu", scanId);
-                        const res = await fetch(`/api/field/NDVIDataById/${scanId}`, {
-                            headers: { "Authorization": "Bearer " + token }
-                        });
-                        if (!res.ok) throw new Error("Błąd pobierania danych NDVI");
-                        data = await res.json();
-
-                        // Aktualizujemy globalny cache i oznaczamy ID skanu
-                        ndviDataCache = data.ndvi;
-                        ndviDataCache.scanId = scanId;
-                        imageBbox = data.fieldBbox;
-                    }
-                }
-                // SCENARIUSZ B: Najnowsze NDVI (Przycisk "Analiza NDVI")
-                else {
-                    if (ndviDataCache && !ndviDataCache.scanId) { // cache bez scanId to "latest"
-                        console.log("Używam cache dla latest");
-                        data = { ndvi: ndviDataCache, fieldBbox: imageBbox };
-                    } else {
-                        console.log("Pobieram najnowsze NDVI...");
-                        const res = await fetch(`/api/field/latestNDVIData/${fieldId}`, {
-                            headers: { "Authorization": "Bearer " + token }
-                        });
-                        if (res.status === 204) { img.alt = "Brak danych"; return; }
-                        if (!res.ok) throw new Error("Błąd pobierania");
-                        data = await res.json();
-
-                        ndviDataCache = data.ndvi;
-                        imageBbox = data.fieldBbox;
-                    }
-                }
-
-                // Wizualizacja
-                const vizRes = await fetch(`/api/field/visualize`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-                    body: JSON.stringify({
-                        ndviMatrix: ndviDataCache,
-                        fieldBbox: geojson,
-                        bbox: imageBbox
-                    })
-                });
-
-                if (!vizRes.ok) throw new Error("Błąd wizualizacji");
-                const blob = await vizRes.blob();
-                img.src = URL.createObjectURL(blob);
-                img.alt = "Mapa NDVI";
-
-            } catch (err) {
-                console.error(err);
-                img.alt = "Błąd: " + err.message;
-            }
-        }
-
-        // Obsługa przycisku "Analiza NDVI" (Główne menu)
-        document.querySelector("#ndviBtn").addEventListener("click", () => showNdviScan(null));
-
-        // Obsługa przycisku "Grupuj" (Klasteryzacja)
-        clusterButton.addEventListener("click", async () => {
-            console.group("🔍 DIAGNOSTYKA: Kliknięto 'Grupuj'");
-
-            // 1. Walidacja zmiennych
-            console.log("1. Sprawdzanie stanu aplikacji:");
-            console.log("   - ndviDataCache:", ndviDataCache ? "✅ Jest (rozmiar: " + ndviDataCache.length + ")" : "❌ BRAK");
-            console.log("   - selectedPlantStateId:", selectedPlantStateId);
-            console.log("   - imageBbox:", imageBbox);
-            console.log("   - geojson:", geojson ? "✅ Jest" : "❌ BRAK");
-
-            if (!ndviDataCache || ndviDataCache.length === 0) {
-                console.error("❌ Błąd: Brak danych NDVI w pamięci.");
-                alert("Błąd: Brak danych NDVI. Najpierw wyświetl mapę.");
-                console.groupEnd();
-                return;
-            }
-            if (!selectedPlantStateId || selectedPlantStateId === 0) {
-                console.error("❌ Błąd: Brak ID cyklu.");
-                alert("Nie można przeprowadzić analizy.\nPowód: Nie określono cyklu rośliny.");
-                console.groupEnd();
-                return;
-            }
-
-            try {
-                const request = {
-                    cycleId: selectedPlantStateId,
-                    ndvi: ndviDataCache,
-                    fieldGeojson: geojson,
-                    imageBbox: imageBbox,
-                    darkMode: savedTheme === 'dark'
-                };
-
-                console.log("2. Wysyłanie requestu do API:", request);
-
-                const response = await fetch(`/api/field/group/${fieldId}`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-                    body: JSON.stringify(request)
-                });
-
-                console.log("3. Status HTTP odpowiedzi:", response.status);
-
-                if (!response.ok) {
-                    const txt = await response.text();
-                    throw new Error(txt);
-                }
-
-                const result = await response.json();
-
-                // 🛑 KLUCZOWY MOMENT: Sprawdzamy co dokładnie przyszło z serwera
-                console.log("4. Otrzymany JSON z backendu (klucze):", Object.keys(result));
-                console.log("   - mainImageBase64 (długość):", result.mainImageBase64 ? result.mainImageBase64.length : "undefined");
-                console.log("   - legendBase64 (długość):", result.legendBase64 ? result.legendBase64.length : "undefined");
-                console.log("   - mainImage (stary format?):", result.mainImage ? "Tak" : "Nie");
-
-                // Obsługa różnych nazw (MainImageBase64 vs mainImage)
-                // Backend w C# record zwraca PascalCase, ale JSON serializer w .NET domyślnie robi camelCase
-                const mainImgData = result.mainImageBase64 || result.mainImage;
-                const legImgData = result.legendBase64 || result.legend;
-
-                if (mainImgData) {
-                    console.log("5. Podmieniam źródło obrazu mapy...");
-                    ndviImage.src = `data:image/png;base64,${mainImgData}`;
-                } else {
-                    console.warn("⚠️ Ostrzeżenie: Brak danych obrazu w odpowiedzi!");
-                }
-
-                // Przełączanie widoczności legendy
-                console.log("6. Aktualizacja UI legendy...");
-                if (colorbar) {
-                    console.log("   - Ukrywam stary pasek (colorbar)");
-                    colorbar.style.display = 'none';
-                } else {
-                    console.error("❌ Nie znaleziono elementu #colorbar w DOM");
-                }
-
-                if (legendImage) {
-                    console.log("   - Pokazuję nową legendę");
-                    legendImage.style.display = 'block';
-                    if (legImgData) {
-                        legendImage.src = `data:image/png;base64,${legImgData}`;
-                    } else {
-                        console.warn("⚠️ Ostrzeżenie: Brak danych legendy w odpowiedzi!");
-                    }
-                } else {
-                    console.error("❌ Nie znaleziono elementu #legendImage w DOM");
-                }
-
-                console.log("✅ Proces zakończony sukcesem!");
-
-            } catch (err) {
-                console.error("❌ BŁĄD KRYTYCZNY:", err);
-                alert("Błąd analizy: " + err.message);
-            } finally {
-                console.groupEnd();
-            }
-        });
-
-        // =========================================================
-        // 8. IMPORT NOWEGO SKANU
-        // =========================================================
-
-        const zipInput = document.querySelector("#tiffInput");
-        const dateModal = document.getElementById("scanDateModal");
-        const scanDateInput = document.getElementById("scanDateInput");
-        let selectedZipFile = null;
-
-        document.querySelector("#importBtn").addEventListener("click", () => zipInput.click());
-
-        zipInput.addEventListener("change", (e) => {
-            if (e.target.files.length > 0) {
-                selectedZipFile = e.target.files[0];
-                dateModal.style.display = "block";
-            }
-        });
-
-        document.querySelector("#dateForm").addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const dateVal = scanDateInput.value;
-            dateModal.style.display = "none";
-
-            if (!selectedZipFile || !dateVal) return;
-
-            const formData = new FormData();
-            formData.append("date", dateVal);
-            formData.append("zip", selectedZipFile);
-            formData.append("geojson", geojson);
-
-            try {
-                const res = await fetch(`/api/field/uploadScan/${fieldId}`, {
-                    method: "POST",
-                    headers: { "Authorization": "Bearer " + token },
-                    body: formData
-                });
-
-                if (!res.ok) {
-                    const msg = await res.text();
-                    throw new Error(msg);
-                }
-                alert(`✅ Skan zapisany!`);
-                loadLatestScan(); // Odśwież widok
-            } catch (err) {
-                alert("❌ Błąd: " + err.message);
-            } finally {
-                zipInput.value = "";
-                selectedZipFile = null;
-            }
-        });
-
-        // =========================================================
-        // 9. NARZĘDZIA UI (ZAMYKANIE MODALI, COLORBAR)
-        // =========================================================
-
-        function updateColorbar() {
-            if (colorbar) {
-                const isDark = localStorage.getItem('theme') === 'dark';
-                colorbar.src = isDark ? '/css/colorbarDark.png' : '/css/colorbar.png';
-            }
-        }
-
-        // Uniwersalne zamykanie modali
-        document.querySelectorAll(".modal").forEach(modal => {
-            const closeBtns = modal.querySelectorAll(".btn-close, .btn-cancel");
-            closeBtns.forEach(btn => btn.addEventListener("click", () => closeModal(modal)));
-
-            window.addEventListener("click", (e) => {
-                if (e.target === modal) closeModal(modal);
-            });
-        });
-
-        function closeModal(modal) {
-            modal.style.display = "none";
-            // Reset widoku NDVI przy zamknięciu
-            if (modal.id === "ndviModal") {
-                if (colorbar) colorbar.style.display = 'block';
-                if (legendImage) legendImage.style.display = 'none';
-            }
-        }
-
-    </script>
+    <script src="js/fieldDashboard.js"></script>
 </body>
 </html>

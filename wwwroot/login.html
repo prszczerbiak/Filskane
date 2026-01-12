@@ -1,0 +1,56 @@
+﻿<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logowanie Filskane</title>
+    <link rel="stylesheet" href="css/loginStyle.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Quicksand:wght@300..700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="content">
+        <div class="container1">
+            <div class="background"></div>
+        </div>
+        <div class="container2">
+            <div class="logo">
+                <h1>Filskane</h1>
+                <p>Logo aplikacji</p>
+            </div>
+
+            <div class="login_area">
+                <h2>Logowanie</h2>
+
+                <form id="loginForm">
+                    <div class="form-group">
+                        <input type="text" id="username" placeholder="Nazwa użytkownika" required autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="password" placeholder="Hasło" required autocomplete="current-password">
+                    </div>
+                    <button class="log-in" type="submit">Zaloguj się</button>
+                </form>
+
+                <div id="errorMessage" class="error-message">
+                    Nieprawidłowy login lub hasło!
+                </div>
+
+                <div class="actions">
+                    <button class="forgot-password" type="button">Zapomniałeś hasła?</button>
+
+                    <button id="registerBtn" class="register" type="button">Zarejestruj się</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 Filskane. Wszelkie prawa zastrzeżone.</p>
+    </footer>
+
+    <script src="js/login.js"></script>
+</body>
+</html>

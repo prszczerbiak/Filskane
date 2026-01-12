@@ -1,64 +1,210 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Text.Json;
+using System.Text.Json.Serialization;
+using OSGeo.GDAL;
 
 namespace WebApplication1.Models
 {
+    /// <summary>
+    /// Szczegółowe dane o polu, zawierające informacje o glebie, aktualnej uprawie i geometrii.
+    /// </summary>
     public record FieldDetailDto(
-        int Id, string Name,
-        int? CropId, string PlantName,
-        int? PlantStateId, string CycleName,
+        int Id,
+        string Name,
+        int? CropId,
+        string PlantName,
+        int? PlantStateId,
+        string CycleName,
         DateTime? SowingDate,
-        string SoilComplex, string SoilType, string SoilSubstrate,
-        double Area, string Geojson, string MinBbox
+        string SoilComplex,
+        string SoilType,
+        string SoilSubstrate,
+        double Area,
+        string Geojson,
+        Bbox? MinBbox
     );
 
-    // Do zapisu zmian
+    /// <summary>
+    /// Model danych do zapisu zmian w konfiguracji pola (zmiana uprawy lub daty siewu).
+    /// </summary>
     public record UpdateFieldRequest(int? CropId, DateTime? SowingDate);
 
-    // Do cykli
+    /// <summary>
+    /// Obiekt transferowy reprezentujący fazę cyklu wzrostu rośliny.
+    /// </summary>
     public record CycleDto(int Id, string Name);
 
-    // Do listy skanów
+    /// <summary>
+    /// Podsumowanie informacji o skanie satelitarnym (do wyświetlania na listach).
+    /// </summary>
     public record ScanSummaryDto(int Id, int FieldId, DateTime Date);
 
-    // Do roślin
+    /// <summary>
+    /// Obiekt słownikowy reprezentujący roślinę uprawną.
+    /// </summary>
     public record PlantDto(int Id, string Name);
 
-    // Do progów (GrowthCycles)
+    /// <summary>
+    /// Definicja progów wartości NDVI dla poszczególnych cykli wzrostu.
+    /// </summary>
     public record ThresholdDto(int CycleId, double MinNdvi, double MaxNdvi);
 
-    // Wynik pobrania skanu (Obraz + Metadane)
+    /// <summary>
+    /// Wynik pobrania skanu zawierający dane obrazu oraz jego granice geograficzne.
+    /// </summary>
     public record ScanResultDto(
         DateTime ScanDate,
         byte[] ImageBytes,
-        string FieldBbox
+        Bbox? FieldBbox
     );
 
+    /// <summary>
+    /// Zawiera surowe dane numeryczne NDVI w formie macierzy oraz BBox pola.
+    /// </summary>
     public record NdviDataDto(
-        List<List<double>> Ndvi, // Jeśli ScanResult zwraca float, zmień tutaj double na float
-        string? FieldBbox
+        List<List<double>> Ndvi,
+        Bbox? FieldBbox
     );
 
+    /// <summary>
+    /// Model służący do przesyłania nowych plików skanów (TIFF) spakowanych w ZIP.
+    /// </summary>
+    /// <param name="Date">Data wykonania skanu.</param>
+    /// <param name="Zip">Plik ZIP zawierający obrazy (może być null przed walidacją).</param>
+    /// <param name="Geojson">Opcjonalna geometria pola.</param>
     public record UpdateTiffsDto(
         DateTime Date,
-        IFormFile? Zip,   // Nullable, bo walidację "czy plik istnieje" robisz ręcznie w kontrolerze
+        IFormFile? Zip,
         string? Geojson
     );
 
+    /// <summary>
+    /// Prosty wrapper na GeoJSON wysyłany w żądaniach.
+    /// </summary>
     public record ScanRequestDto(string Geojson);
 
+    /// <summary>
+    /// Dane wejściowe do wygenerowania wizualizacji graficznej (PNG) indeksu NDVI.
+    /// </summary>
+    /// <param name="NdviMatrix">Macierz wartości NDVI.</param>
+    /// <param name="FieldBbox">Opcjonalne granice pola w formacie string.</param>
+    /// <param name="Bbox">Opcjonalne granice obrazu.</param>
     public record NdviVisualizationDto(
-        List<List<double>> NdviMatrix, // Główna macierz danych
-        string? FieldBbox,             // Opcjonalne granice pola
-        string? Bbox                   // Opcjonalne granice obrazu
+        List<List<double>> NdviMatrix,
+        string? FieldBbox,
+        Bbox? Bbox
     );
 
+    /// <summary>
+    /// Wynik grupowania ryzyka zawierający obrazy w formacie Base64.
+    /// </summary>
+    /// <param name="MainImageBase64">Obraz mapy z nałożonymi strefami ryzyka.</param>
+    /// <param name="LegendBase64">Obraz legendy kolorystycznej.</param>
     public record GroupingResultDto(
-        string MainImageBase64, // Główna mapa z nałożonym ryzykiem
-        string LegendBase64     // Pasek legendy
+        string MainImageBase64,
+        string LegendBase64
     );
 
+    /// <summary>
+    /// Wynik działania algorytmu DBSCAN z API Pythonowego.
+    /// </summary>
     public record DbscanResultDto(
-    [property: JsonPropertyName("cluster_ids")] int[] ClusterIds,
-    [property: JsonPropertyName("ndvi_medians")] Dictionary<string, double> NdviMedians
-);
+        [property: JsonPropertyName("cluster_ids")] int[] ClusterIds,
+        [property: JsonPropertyName("ndvi_means")] Dictionary<string, double> NdviMeans
+    );
+
+    /// <summary>
+    /// Parametry żądania o pogrupowanie (klasteryzację) danych NDVI.
+    /// </summary>
+    public record NdviGroupRequestDto
+    {
+        public int CycleId { get; init; }
+        public List<List<double>> Ndvi { get; init; } = [];
+        public string? FieldGeojson { get; init; }
+        public Bbox? ImageBbox { get; init; }
+        public bool DarkMode { get; init; } = false;
+    }
+
+    /// <summary>
+    /// Klasa reprezentująca prostokąt ograniczający (Bounding Box) w układzie współrzędnych geograficznych.
+    /// </summary>
+    public class Bbox
+    {
+        /// <summary>
+        /// Konstruktor bezparametrowy (wymagany do serializacji).
+        /// </summary>
+        public Bbox() { }
+
+        /// <summary>
+        /// Inicjalizuje Bbox z podanymi współrzędnymi skrajnymi.
+        /// </summary>
+        public Bbox(double minX, double minY, double maxX, double maxY)
+        {
+            MinX = minX;
+            MinY = minY;
+            MaxX = maxX;
+            MaxY = maxY;
+        }
+
+        [JsonPropertyName("minX")]
+        public double MinX { get; set; }
+
+        [JsonPropertyName("minY")]
+        public double MinY { get; set; }
+
+        [JsonPropertyName("maxX")]
+        public double MaxX { get; set; }
+
+        [JsonPropertyName("maxY")]
+        public double MaxY { get; set; }
+
+        /// <summary>
+        /// Deserializuje obiekt Bbox z ciągu JSON, obsługując różną wielkość liter w nazwach właściwości.
+        /// </summary>
+        public static Bbox? FromJson(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return null;
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                double GetVal(string keyLower, string keyUpper)
+                {
+                    if (root.TryGetProperty(keyLower, out var p1)) return p1.GetDouble();
+                    if (root.TryGetProperty(keyUpper, out var p2)) return p2.GetDouble();
+                    return 0.0;
+                }
+
+                return new Bbox(
+                    GetVal("minX", "MinX"),
+                    GetVal("minY", "MinY"),
+                    GetVal("maxX", "MaxX"),
+                    GetVal("maxY", "MaxY")
+                );
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Tworzy obiekt Bbox na podstawie geotransformacji ze zbioru danych GDAL.
+        /// </summary>
+        public static Bbox? FromGdal(Dataset ds)
+        {
+            double[] gt = new double[6];
+            ds.GetGeoTransform(gt);
+            double minX = gt[0];
+            double maxY = gt[3];
+            double maxX = minX + (gt[1] * ds.RasterXSize);
+            double minY = maxY + (gt[5] * ds.RasterYSize);
+            return new Bbox { MinX = minX, MaxX = maxX, MinY = minY, MaxY = maxY };
+        }
+
+        /// <summary>
+        /// Zwraca reprezentację obiektu w formacie JSON.
+        /// </summary>
+        public override string ToString() => JsonSerializer.Serialize(this);
+    }
 }

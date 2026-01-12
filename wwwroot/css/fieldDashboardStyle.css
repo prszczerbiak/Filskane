@@ -1,111 +1,244 @@
-﻿body {
-    font-family: Arial, sans-serif;
-    background-color: #f8f8f8;
-    text-align: center;
+﻿/* =========================================
+   1. ZMIENNE (Spójne z resztą systemu)
+   ========================================= */
+:root {
+    --primary-color: #007BFF;
+    --primary-hover: #0056b3;
+    --success-color: #28a745;
+    --danger-color: red;
+    --frame-color: green;
+    --bg-color: #f8f8f8;
+    --container-bg: #ffffff;
+    --text-color: #333;
+    --border-color: #ddd;
+    --modal-bg: #fff;
+    --shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
 
+/* =========================================
+   2. RESET I BAZA
+   ========================================= */
 html, body {
     margin: 0;
     padding: 0;
-    height: 100%; /* Upewnij się, że body i html mają wysokość 100% */
+    height: 100%;
+    font-family: Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    text-align: center;
 }
 
+/* =========================================
+   3. GŁÓWNY LAYOUT (.content)
+   ========================================= */
 .content {
-    border: 5px solid green;
+    border: 5px solid var(--frame-color);
+    border-radius: 15px;
+    background-color: var(--container-bg);
     width: calc(100% - 100px);
     min-height: calc(100vh - 120px);
+    margin: 20px 50px;
     padding: 20px;
     box-sizing: border-box;
-    background-color: white;
-    border-radius: 15px;
-    margin: 20px 50px;
     display: flex;
-    flex-direction: column; /* nagłówek na górze, kafelki pod spodem */
-    /* usuwamy align-items i justify-content! */
+    flex-direction: column;
 }
 
-
-footer {
-    background-color: green; /* Zielone tło */
-    color: white; /* Biały tekst */
-    text-align: center; /* Wyśrodkowanie tekstu */
-    padding: 15px; /* Wewnętrzny odstęp */
-    /*position: fixed; /* Przyklejenie stopki do dołu */
-    bottom: 0;
-    left: 0; /* Przypięcie do lewej strony */
-    width: 100%; /* Pełna szerokość ekranu */
-    box-sizing: border-box; /* Zapobiega przesunięciom przez padding */
+.title {
+    margin-bottom: 20px;
 }
 
+/* Kontener na dwie kolumny */
 .fieldContent {
     display: flex;
-    justify-content: space-between; /* odstęp między kolumnami */
-    gap: 100px; /* opcjonalna przerwa */
-    margin-top: 20px;
+    flex-wrap: wrap;
     width: 100%;
-    flex: 1; /* <-- wypełni całą dostępną wysokość */
-    align-items: stretch; /* <-- kolumny rozciągną się na całość */
+    /* Brak gap, używamy paddingu wewnątrz kolumn */
 }
 
-.field {
-    flex: 1; /* obie zajmą po 50% */
+/* LEWA KOLUMNA - Zawsze 50% szerokości ekranu */
+.fieldScan {
+    flex: 0 0 50%;
+    max-width: 50%;
+    box-sizing: border-box;
     padding: 10px;
-}
-
-.fieldScan{
-    flex: 1; /* obie zajmą po 50% */
-    padding: 10px;
-    margin-top: 15px;
-}
-
-.actions {
+    /* Centrowanie obrazka wewnątrz tej połówki */
     display: flex;
-    gap: 10px; /* odstęp między guzikami */
-    margin: 20px 0;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
 }
-    #clustering,
-    .actions button {
-        background-color: #007BFF; /* niebieski */
-        color: white; /* biały napis */
-        border: none; /* bez obramowania */
-        padding: 10px 20px; /* wewnętrzne marginesy */
-        border-radius: 6px; /* zaokrąglone rogi */
-        font-size: 16px;
-        cursor: pointer;
-        transition: background-color 0.3s ease;
+
+/* PRAWA KOLUMNA - Zawsze 50% szerokości ekranu */
+.field {
+    flex: 0 0 50%;
+    max-width: 50%;
+    box-sizing: border-box;
+    padding: 10px;
+    text-align: left;
+    padding: 20px 75px;
+}
+
+/* OBRAZEK - Specyficzne wymaganie */
+.scan-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+    .scan-container img,
+    #scanImage {
+        /* 1. Twoje wymaganie: */
+        width: 450px; /* Dąż do 450px... */
+        /* 2. Zabezpieczenie: */
+        max-width: 100%; /* ...ale jeśli kolumna (50% ekranu) jest węższa, dopasuj się do niej */
+
+        height: auto; /* Zachowaj proporcje */
+        object-fit: contain;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        display: block;
     }
 
-        .actions button:hover {
-            background-color: #0056b3; /* ciemniejszy niebieski po najechaniu */
-        }
-
-.fieldInfo {
-    text-align: left;
+footer {
+    background-color: var(--frame-color);
+    color: white;
+    text-align: center;
+    padding: 15px;
+    margin-top: auto; /* Wypycha footer na dół jeśli content jest krótki */
 }
 
-table {
+/* =========================================
+   4. TABELE I INFORMACJE
+   ========================================= */
+.fieldInfo table {
+    width: 100%;
     border-collapse: collapse;
+    margin-top: 10px;
 }
 
-td {
-    padding: 5px 30px; /* odstęp między kolumnami i wierszami */
-    vertical-align: top;
+.fieldInfo td {
+    padding: 8px 15px;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--border-color);
 }
 
-h4 {
+.fieldInfo tr:last-child td {
+    border-bottom: none;
+}
+
+.fieldInfo strong {
     font-weight: bold;
-    margin-top: 1em;
-    margin-bottom: 1em;
+    color: var(--text-color);
 }
 
-.fa-regular.fa-pen-to-square {
-    margin-top: 1em;
-    margin-bottom: 1em;
+.edit-btn {
+    color: var(--primary-color);
+    font-size: 1.1em;
+    margin-left: 10px;
+    cursor: pointer;
+    transition: color 0.2s;
 }
 
+    .edit-btn:hover {
+        color: var(--primary-hover);
+    }
+
+/* =========================================
+   5. PRZYCISKI I AKCJE
+   ========================================= */
+.actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 30px;
+    flex-wrap: wrap; /* Pozwala zawijać przyciski na małych ekranach */
+}
+
+button {
+    border: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.1s;
+    color: white;
+}
+
+    button:active {
+        transform: scale(0.98);
+    }
+
+/* Warianty przycisków */
+.btn-primary {
+    background-color: var(--primary-color);
+}
+
+    .btn-primary:hover {
+        background-color: var(--primary-hover);
+    }
+
+.btn-success {
+    background-color: var(--success-color);
+}
+
+    .btn-success:hover {
+        background-color: #218838;
+    }
+
+.btn-info {
+    background-color: #17a2b8;
+}
+
+    .btn-info:hover {
+        background-color: #138496;
+    }
+
+.btn-warning {
+    background-color: var(--primary-color);
+    color: #FFF;
+}
+
+    .btn-warning:hover {
+        background-color: var(--primary-hover);
+    }
+
+.btn-danger {
+    background-color: var(--danger-color);
+}
+
+    .btn-danger:hover {
+        background-color: #c82333;
+    }
+
+.btn-cancel {
+    background-color: #6c757d;
+}
+
+    .btn-cancel:hover {
+        background-color: #5a6268;
+    }
+
+.btn-save {
+    background-color: var(--success-color);
+}
+
+.btn-close {
+    background-color: var(--danger-color);
+}
+
+/* Małe przyciski w tabeli historii */
+.btn-sm {
+    padding: 5px 10px;
+    font-size: 14px;
+    margin-right: 5px;
+}
+
+/* =========================================
+   6. MODALE
+   ========================================= */
 .modal {
-    display: none; /* domyślnie ukryty */
+    display: none;
     position: fixed;
     z-index: 1000;
     left: 0;
@@ -114,22 +247,177 @@ h4 {
     height: 100%;
     overflow: auto;
     background-color: rgba(0,0,0,0.5);
+    backdrop-filter: blur(2px); /* Nowoczesny efekt rozmycia tła */
 }
 
-.modal-content {
-    background-color: #fff;
-    margin: 10% auto;
-    padding: 20px;
+/* Bazowy wygląd okna modala */
+.modal-content,
+.historyModal-content,
+.nvdiModal-content {
+    background-color: var(--modal-bg);
+    margin: 5% auto;
+    padding: 25px;
     border-radius: 10px;
-    width: 400px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    box-shadow: var(--shadow);
     animation: fadeIn 0.3s ease-in-out;
+    position: relative;
 }
 
+/* Rozmiary modali */
+.modal-content {
+    width: 400px;
+    max-width: 90%;
+}
+
+.historyModal-content {
+    width: 700px;
+    max-width: 95%;
+}
+
+.nvdiModal-content {
+    width: 900px;
+    max-width: 95%;
+    text-align: center;
+}
+
+/* Formularze w modalach */
+form label {
+    display: block;
+    margin: 10px 0 5px;
+    text-align: left;
+}
+
+form input, form select {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 20px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-sizing: border-box; /* Zapobiega wychodzeniu poza ramkę */
+}
+
+.modal-footer {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.nvdiPicture {
+    display: flex;
+    flex-direction: column; /* Układa obrazki jeden pod drugim */
+    align-items: center; /* Wyśrodkowuje je w poziomie */
+    justify-content: center;
+    width: 100%;
+    margin-top: 20px;
+}
+
+    /* Opcjonalnie: upewnij się, że obrazki nie wychodzą poza ekran */
+    .nvdiPicture img {
+        max-width: 100%;
+        height: auto;
+    }
+
+/* Opcjonalnie: odstęp między mapą a paskiem kolorów */
+#colorbar {
+    margin-top: 10px;
+    max-width: 80%; /* Żeby pasek nie był gigantyczny na dużych ekranach */
+}
+
+/* Tabela historii */
+#scanHistoryTable {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+    #scanHistoryTable th, #scanHistoryTable td {
+        padding: 10px;
+        border-bottom: 1px solid #ddd;
+        text-align: center;
+    }
+
+    #scanHistoryTable th {
+        background-color: #f2f2f2;
+        color: #333;
+    }
+
+/* =========================================
+   7. LOADER (Nowość)
+   ========================================= */
+.loader {
+    font-size: 1.2em;
+    color: var(--primary-color);
+    font-weight: bold;
+    margin: 20px 0;
+}
+
+/* =========================================
+   8. DARK MODE
+   ========================================= */
+.dark-theme {
+    --bg-color: #202123;
+    --container-bg: #2a2b2e;
+    --text-color: #e5e5e5;
+    --modal-bg: #2a2b2e;
+    --border-color: #444;
+}
+
+    .dark-theme .fieldInfo td {
+        border-bottom-color: var(--border-color);
+    }
+
+    .dark-theme form input,
+    .dark-theme form select {
+        background-color: #3e3f4b;
+        color: white;
+        border: 1px solid #555;
+    }
+
+    .dark-theme #scanHistoryTable th {
+        background-color: #3e3f4b;
+        color: white;
+    }
+
+    .dark-theme .modal-content,
+    .dark-theme .historyModal-content,
+    .dark-theme .nvdiModal-content {
+        background-color: var(--modal-bg);
+        color: var(--text-color);
+    }
+
+/* =========================================
+   9. RESPONSYWNOŚĆ (Mobile)
+   ========================================= */
+@media (max-width: 768px) {
+    .content {
+        width: 95%;
+        margin: 10px auto;
+        padding: 10px;
+    }
+
+    .fieldContent {
+        flex-direction: column; /* Kolumny jedna pod drugą */
+        gap: 20px;
+    }
+
+    .fieldScan, .field {
+        width: 100%;
+        padding: 0;
+    }
+
+    .actions {
+        flex-direction: column;
+    }
+
+        .actions button {
+            width: 100%;
+        }
+}
+
+/* Animacja wejścia */
 @keyframes fadeIn {
     from {
         opacity: 0;
-        transform: translateY(-10px);
+        transform: translateY(-20px);
     }
 
     to {
@@ -138,145 +426,10 @@ h4 {
     }
 }
 
-.close {
-    float: right;
-    font-size: 20px;
-    font-weight: bold;
-    cursor: pointer;
-    color: #444;
-}
-
-    .close:hover {
-        color: red;
-    }
-
-form label {
-    display: block;
-    margin: 10px 0 5px;
-}
-
-form input, form select {
-    width: 100%;
-    padding: 8px;
-    margin-bottom: 15px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-}
-
-.modal-footer {
-    text-align: center;
-}
-
-    .modal-footer button {
-        padding: 8px 15px;
-        margin-left: 10px;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-    }
-
-.btn-cancel {
-    background: #ccc;
-}
-
-.btn-close {
-    background-color: #e74c3c; /* czerwony */
-    color: white;
-}
-
-.btn-save {
-    background: #28a745;
-    color: #fff;
-}
-
-.colConst{
-    width: 250px;
-}
-
 #ndviImage,
 #scanImage,
 #rgbImage {
-    width: 80%; /* zajmuje 80% szerokości kontenera */
+    width: 70%; /* zajmuje 80% szerokości kontenera */
     height: auto; /* proporcje zachowane */
 }
-
-.modal-footer{
-    margin: 20px 0;
-}
-
-.btn-preview-ndvi,
-.btn-preview-photo{
-    background-color: #007BFF; /* niebieski */
-    color: white; /* biały napis */
-    border: none; /* bez obramowania */
-    padding: 5px 10px; /* wewnętrzne marginesy */
-    border-radius: 6px; /* zaokrąglone rogi */
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-    display: inline-block;
-}
-
-.historyModal-content {
-    background-color: #fff;
-    margin: 10% auto;
-    padding: 20px;
-    border-radius: 10px;
-    width: 700px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    animation: fadeIn 0.3s ease-in-out;
-}
-
-.nvdiModal-content {
-    background-color: #fff;
-    margin: 10% auto;
-    padding: 20px;
-    border-radius: 10px;
-    width: 900px;
-    height: auto;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    animation: fadeIn 0.3s ease-in-out;
-}
-
-.nvdiContainer{
-    text-align: center;
-    max-width: 450px;
-}
-
-#clustering {
-    background-color: #007BFF; /* niebieski */
-    color: white; /* biały napis */
-    border: none; /* bez obramowania */
-    padding: 10px 20px; /* wewnętrzne marginesy */
-    border-radius: 6px; /* zaokrąglone rogi */
-    font-size: 16px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-}
-
-    #clustering:hover {
-        background-color: #0056b3; /* ciemniejszy niebieski po najechaniu */
-    }
-
-.dark-theme body {
-    background-color: #202123; /* szare tło całej strony */
-    color: #e5e5e5; /* jasny tekst */
-}
-
-.dark-theme .content {
-    background-color: #2a2b2e; /* ciemniejsze tło kontenera (GPT-style) */
-    color: #e5e5e5; /* jasny tekst wewnątrz contentu */
-}
-
-.dark-theme .modal-content {
-    background-color: #202123;
-}
-
-.dark-theme .nvdiModal-content {
-    background-color: #2a2b2e;
-}
-
-.dark-theme .historyModal-content {
-    background-color: #2a2b2e;
-}
-
 

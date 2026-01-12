@@ -1,0 +1,173 @@
+﻿/* =========================================
+   1. GLOBALNE USTAWIENIA
+   ========================================= */
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f8f8f8;
+    text-align: center;
+}
+
+h1 {
+    color: #333;
+}
+
+h2 {
+    margin-bottom: 20px;
+}
+
+/* =========================================
+   2. GŁÓWNY UKŁAD (LAYOUT)
+   ========================================= */
+.content {
+    display: flex;
+    justify-content: space-between;
+    width: calc(100% - 40px);
+    min-height: calc(100vh - 120px); /* Cała wysokość minus stopka */
+    margin: 20px;
+    padding: 20px;
+    border: 5px solid green;
+    border-radius: 15px;
+    background-color: white;
+    box-sizing: border-box;
+}
+
+.container1 {
+    flex: 2;
+    margin: 0 10px;
+    padding: 10px;
+}
+
+.container2 {
+    flex: 1;
+    margin: 0 10px;
+    padding: 10px;
+}
+
+/* =========================================
+   3. ELEMENTY GRAFICZNE I LOGO
+   ========================================= */
+.background {
+    height: 100%;
+    background-image: url('https://images.pexels.com/photos/2933243/pexels-photo-2933243.jpeg');
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+}
+
+.logo {
+    margin-top: 50px;
+    border: 5px solid black;
+    font-family: 'Quicksand', sans-serif;
+}
+
+/* =========================================
+   4. FORMULARZ LOGOWANIA
+   ========================================= */
+.login_area {
+    padding: 20px;
+    background: white;
+    text-align: center;
+}
+
+input {
+    width: 100%;
+    margin: 10px 0;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-sizing: border-box;
+}
+
+/* =========================================
+   5. PRZYCISKI (BUTTONS)
+   ========================================= */
+button {
+    transition: background-color 0.3s ease;
+}
+
+/* Przycisk Logowania */
+.log-in {
+    width: 100%;
+    padding: 10px;
+    background-color: #28a745;
+    color: white;
+    font-size: 16px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+    .log-in:hover {
+        background-color: #218838;
+    }
+
+/* Przycisk Rejestracji */
+.register {
+    width: 80%;
+    margin-top: 50px;
+    padding: 15px;
+    background-color: white;
+    color: black;
+    font-size: 16px;
+    border: 3px solid #28a745;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+    .register:hover {
+        background-color: #28a745;
+        color: white;
+    }
+
+/* Link "Zapomniałeś hasła?" */
+.forgot-password {
+    display: block;
+    margin: 10px auto;
+    background: none;
+    color: grey;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+    .forgot-password:hover {
+        color: #0056b3;
+    }
+
+/* =========================================
+   6. KOMUNIKATY I INNE
+   ========================================= */
+.error-message {
+    display: none;
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #f8d7da;
+    color: #dc3545;
+    font-size: 13px;
+    border: 1px solid #f5c6cb;
+    /* Uwaga: upewnij się, że ta zmienna jest zdefiniowana w :root, 
+       jeśli nie - wpisz tu po prostu 5px */
+    border-radius: var(--input-radius, 5px);
+}
+
+/* =========================================
+   7. STOPKA
+   ========================================= */
+footer {
+    width: 100%;
+    padding: 15px;
+    background-color: green;
+    color: white;
+    text-align: center;
+    box-sizing: border-box;
+    /* Właściwości pozycjonowania (nieaktywne bez position: fixed/absolute) */
+    bottom: 0;
+    left: 0;
+}

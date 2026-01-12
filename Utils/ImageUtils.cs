@@ -1,71 +1,113 @@
-﻿using SixLabors.ImageSharp;
+﻿using OSGeo.GDAL;
+using SixLabors.Fonts;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Drawing.Processing;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
-using SixLabors.ImageSharp.Drawing.Processing;
-using BitMiracle.LibTiff.Classic;
-using SixLabors.Fonts; // Jeśli używasz legendy z tekstem
+using WebApplication1.Models; 
 
 namespace WebApplication1.Utils;
 
+/// <summary>
+/// Klasa pomocnicza w operacjach na obrazie png/tiff
+/// </summary>
 public static class ImageUtils
 {
-    // --- 1. KONWERSJE FORMATÓW ---
-
+    #region Public Methods
+    /// <summary>
+    /// Funkcja konwertująca obraz formatu tiff z png
+    /// </summary>
+    /// <param name="tiffBytes">Tablica bajtowa zawierająca obraz tiff</param>
+    /// <returns>Zwraca tablicę bajtową zawierającą obraz w formacie png</returns>
+    /// <exception cref="Exception"></exception>
     public static byte[] ConvertTiffToPng(byte[] tiffBytes)
     {
-        using var inputStream = new MemoryStream(tiffBytes);
-        using var tiff = Tiff.ClientOpen("in-mem", "r", inputStream, new TiffStream());
+        Gdal.PushErrorHandler("CPLQuietErrorHandler");
+        Gdal.AllRegister();
+        string memPath = $"/vsimem/img_convert_{Guid.NewGuid()}.tif";
 
-        if (tiff == null) throw new Exception("Błąd odczytu TIFF");
-
-        int w = tiff.GetField(TiffTag.IMAGEWIDTH)[0].ToInt();
-        int h = tiff.GetField(TiffTag.IMAGELENGTH)[0].ToInt();
-        int samples = tiff.GetField(TiffTag.SAMPLESPERPIXEL)[0].ToInt();
-        int scanlineSize = tiff.ScanlineSize();
-        byte[] scanline = new byte[scanlineSize];
-
-        using var image = new Image<Rgb24>(w, h);
-
-        for (int y = 0; y < h; y++)
+        try
         {
-            tiff.ReadScanline(scanline, y);
-            for (int x = 0; x < w; x++)
+            Gdal.FileFromMemBuffer(memPath, tiffBytes);
+            using var ds = Gdal.Open(memPath, Access.GA_ReadOnly);
+            if (ds == null) throw new Exception("Błąd odczytu TIFF przez GDAL");
+
+            int w = ds.RasterXSize;
+            int h = ds.RasterYSize;
+
+            using var bandBlue = ds.GetRasterBand(1);
+            using var bandGreen = ds.GetRasterBand(2);
+            using var bandRed = ds.GetRasterBand(3);
+
+            int[] rBuffer = new int[w * h];
+            int[] gBuffer = new int[w * h];
+            int[] bBuffer = new int[w * h];
+
+            bandRed.ReadRaster(0, 0, w, h, rBuffer, w, h, 0, 0);
+            bandGreen.ReadRaster(0, 0, w, h, gBuffer, w, h, 0, 0);
+            bandBlue.ReadRaster(0, 0, w, h, bBuffer, w, h, 0, 0);
+
+            using var image = new Image<Rgb24>(w, h);
+
+            image.ProcessPixelRows(accessor =>
             {
-                int offset = x * samples * 2;
-                // Sentinel-2 (RGB): B04(Red), B03(Green), B02(Blue)
-                // Offsety: 0=Blue, 2=Green, 4=Red
-                ushort b = BitConverter.ToUInt16(scanline, offset + 0);
-                ushort g = BitConverter.ToUInt16(scanline, offset + 2);
-                ushort r = BitConverter.ToUInt16(scanline, offset + 4);
+                for (int y = 0; y < h; y++)
+                {
+                    var pixelRow = accessor.GetRowSpan(y);
+                    int rowOffset = y * w;
+                    for (int x = 0; x < w; x++)
+                    {
+                        int i = rowOffset + x;
+                        byte r = (byte)Math.Min((rBuffer[i] * 255f) / 16383f, 255);
+                        byte g = (byte)Math.Min((gBuffer[i] * 255f) / 16383f, 255);
+                        byte b = (byte)Math.Min((bBuffer[i] * 255f) / 16383f, 255);
+                        pixelRow[x] = new Rgb24(r, g, b);
+                    }
+                }
+            });
 
-                // Normalizacja dla wyświetlania (rozjaśnienie)
-                image[x, y] = new Rgb24(
-                    (byte)(Math.Min(r * 255f / 16383, 255)),
-                    (byte)(Math.Min(g * 255f / 16383, 255)),
-                    (byte)(Math.Min(b * 255f / 16383, 255))
-                );
-            }
+            using var ms = new MemoryStream();
+            image.SaveAsPng(ms);
+            return ms.ToArray();
         }
-
-        using var ms = new MemoryStream();
-        image.SaveAsPng(ms);
-        return ms.ToArray();
+        finally
+        {
+            Gdal.Unlink(memPath);
+        }
     }
-
-    // --- 2. RYSOWANIE I EDYCJA ---
-
-    public static byte[] DrawGeoJsonPolygonOnImage(byte[] imageBytes, string geoJson, string bboxJson, bool isThick)
+    /// <summary>
+    /// Funkcja rysująca obrys pola na zdjęciu png
+    /// </summary>
+    /// <param name="imageBytes">Tablica bajtowa zawierająca obraz png</param>
+    /// <param name="geoJson">Geojson zawierający infomracje po polygonie pola</param>
+    /// <param name="bbox">Współrzędne zdjęcia w przestrzeni</param>
+    /// <param name="isThick">Zmienna boolowska mówiąca czy obraz ma być grubszy (obraz ndvi)</param>
+    /// <returns>Tablica bajtowa z obrazem png i naniesionym na nim zarysie pola</returns>
+    public static byte[] DrawGeoJsonPolygonOnImage(byte[] imageBytes, string geoJson, Bbox? bbox, bool isThick)
     {
+        Console.WriteLine(geoJson);
+        Console.WriteLine(bbox);
         using var image = Image.Load(imageBytes);
-        var bbox = GeoUtils.ParseBbox(bboxJson);
 
-        if (bbox != null)
+        if (bbox == null)
+        {
+            Console.WriteLine("DEBUG: Bbox jest NULL! Nie mogę rysować.");
+        }
+        else
         {
             var points = GeoUtils.GetPolygonPixels(geoJson, bbox, image.Width, image.Height);
+            Console.WriteLine($"DEBUG: Znaleziono {points.Count} punktów do narysowania.");
+
             if (points.Count > 2)
             {
-                float thickness = isThick ? 1.5f : 0.5f;
-                // Rysujemy czerwony obrys
+                float thickness = isThick ? 2.5f : 0.5f;
+
+                Console.WriteLine($"DEBUG: Wymiary obrazka: {image.Width}x{image.Height}");
+                foreach (var p in points)
+                {
+                    Console.WriteLine($"DEBUG PIXEL: X={p.X}, Y={p.Y}");
+                }
+
                 image.Mutate(ctx => ctx.DrawPolygon(Color.Red, thickness, points.ToArray()));
             }
         }
@@ -74,13 +116,17 @@ public static class ImageUtils
         image.SaveAsPng(ms);
         return ms.ToArray();
     }
-
+    /// <summary>
+    /// Funkcja nanosząca na zdjęcie nakładkę (wynik klastrowania)
+    /// </summary>
+    /// <param name="baseBytes">Bazowe zdjęcie</param>
+    /// <param name="overlayBytes">Tablica bajtowa zawierająca nakładkę</param>
+    /// <returns>Połączone zdjęcie w tablicy bajtowej</returns>
     public static byte[] CombineImages(byte[] baseBytes, byte[] overlayBytes)
     {
         using var baseImg = Image.Load<Rgba32>(baseBytes);
         using var overlay = Image.Load<Rgba32>(overlayBytes);
 
-        // Nakłada overlay na baseImg z przezroczystością (jeśli overlay ma alpha)
         baseImg.Mutate(ctx => ctx.DrawImage(overlay, 1f));
 
         using var ms = new MemoryStream();
@@ -88,42 +134,46 @@ public static class ImageUtils
         return ms.ToArray();
     }
 
-    // --- 3. LOGIKA KLASTRÓW I RYZYKA (dla GroupByRisk) ---
-
-    public static byte[] GenerateRiskOverlay(double[,] ndviMatrix, double minT, double maxT)
+    /// <summary>
+    /// Funkcja tworząca nakładkę na wizualizację NDVI, wykorzystując dane z klastrowania
+    /// </summary>
+    /// <param name="points">Współrzędne punktów leżacych w granicy pola</param>
+    /// <param name="labels">Etykiety klas</param>
+    /// <param name="width">Szerokość wizualizacji</param>
+    /// <param name="height">Wysokość wizualizacji</param>
+    /// <param name="means">Średnie w klastrach zagrożonych</param>
+    /// <param name="maxBadNdvi">Maksymalna wartość NDVI "zagrażającego"</param>
+    /// <returns>Tablica bajtów zawierająca nakładkę w postaci png</returns>
+    public static byte[] CreateRiskOverlayFromPoints(double[][] points, int[] labels, int width, int height, Dictionary<string, double> means, double maxBadNdvi)
     {
-        int h = ndviMatrix.GetLength(0);
-        int w = ndviMatrix.GetLength(1);
-
-        // Upscaling, żeby pasowało do heatmapy z PlotUtils (tam daliśmy x6)
         int scale = 6;
-        int newW = w * scale;
-        int newH = h * scale;
+        int newW = width * scale;
+        int newH = height * scale;
 
         using var image = new Image<Rgba32>(newW, newH);
-
-        // Wypełniamy przezroczystością
         image.Mutate(ctx => ctx.Fill(new Rgba32(0, 0, 0, 0)));
 
-        for (int y = 0; y < h; y++)
+        for (int i = 0; i < points.Length; i++)
         {
-            for (int x = 0; x < w; x++)
+            int x = (int)points[i][0];
+            int y = (int)points[i][1];
+            int label = labels[i];
+
+            Rgba32 color;
+            if (label == 0) color = new Rgba32(0, 255, 0, 100);
+            else if (label == 1) color = new Rgba32(255, 255, 0, 100);
+            else {
+                string key = label.ToString();
+                double clusterMean = means.TryGetValue(key, out double value) ? value : 0.0;
+
+                color = GetColorBySeverity(clusterMean, maxBadNdvi);
+            }
+
+            if (color.A > 0)
             {
-                double val = ndviMatrix[y, x];
-                Rgba32 color = new Rgba32(0, 0, 0, 0);
-
-                if (val < minT)
-                    color = new Rgba32(255, 0, 0, 100); // Czerwony (krytyczne), półprzezroczysty
-                else if (val >= minT && val < maxT)
-                    color = new Rgba32(255, 255, 0, 100); // Żółty (ostrzegawczy)
-
-                if (color.A > 0)
-                {
-                    // Rysujemy kwadrat NxN pikseli (skalowanie)
-                    for (int dy = 0; dy < scale; dy++)
-                        for (int dx = 0; dx < scale; dx++)
-                            image[x * scale + dx, y * scale + dy] = color;
-                }
+                for (int dy = 0; dy < scale; dy++)
+                    for (int dx = 0; dx < scale; dx++)
+                        image[x * scale + dx, y * scale + dy] = color;
             }
         }
 
@@ -131,28 +181,56 @@ public static class ImageUtils
         image.SaveAsPng(ms);
         return ms.ToArray();
     }
-
-    public static byte[] GenerateLegend(double minT, double maxT)
+    /// <summary>
+    /// Funkcja tworząca legendę nakładki z danymi klasteryzacji
+    /// </summary>
+    /// <param name="means">Średnie wartości NDVI w klastrach</param>
+    /// <param name="presentClusters">Lista klastrów</param>
+    /// <param name="maxBadNdvi">Maksymalna wartość NDVI "zagrażającego"</param>
+    /// <param name="darkMode">Czy ustawiony darkmode (potrzebne do zmiany kolorów)</param>
+    /// <returns>Tablica bajtowa z legendą w formacie png</returns>
+    public static byte[] CreateLegendWithClusters(Dictionary<string, double> means, int[] presentClusters, double maxBadNdvi, bool darkMode)
     {
-        // Prosta legenda generowana jako obrazek
-        int w = 300, h = 100;
-        using var image = new Image<Rgba32>(w, h);
-        image.Mutate(ctx => ctx.Fill(Color.White));
+        var riskClusters = presentClusters.Distinct().Where(id => id < 0).ToList();
 
-        var font = SystemFonts.CreateFont("Arial", 14);
+        int h = 170 + (riskClusters.Count * 30);
+        int w = 450;
+
+        using var image = new Image<Rgba32>(w, h);
+
+        Color bgColor = darkMode ? Color.ParseHex("#2b2b2b") : Color.White;
+        Color textColor = darkMode ? Color.White : Color.Black;
+
+        image.Mutate(ctx => ctx.Fill(bgColor));
+
+        var font = SystemFonts.CreateFont("Arial", 12);
+        var titleFont = SystemFonts.CreateFont("Arial", 14, FontStyle.Bold);
+        int y = 20;
 
         image.Mutate(ctx => {
-            // Czerwony
-            ctx.Fill(Color.Red, new RectangleF(10, 10, 20, 20));
-            ctx.DrawText($"Ryzyko wysokie (< {minT:F2})", font, Color.Black, new PointF(40, 10));
+            ctx.DrawText("Legenda Ryzyka", titleFont, textColor, new PointF(10, y));
+            y += 35;
 
-            // Żółty
-            ctx.Fill(Color.Yellow, new RectangleF(10, 40, 20, 20));
-            ctx.DrawText($"Ryzyko średnie ({minT:F2} - {maxT:F2})", font, Color.Black, new PointF(40, 40));
+            DrawLegendItem(ctx, new Rgba32(57, 255, 20, 255), "Zdrowe (Wysokie NDVI)", ref y, font, textColor);
+            DrawLegendItem(ctx, Color.Yellow, "Ostrzegawcze (Średnie)", ref y, font, textColor);
 
-            // Zielony
-            ctx.Fill(Color.Green, new RectangleF(10, 70, 20, 20));
-            ctx.DrawText($"Zdrowe (> {maxT:F2})", font, Color.Black, new PointF(40, 70));
+            if (riskClusters.Count > 0)
+            {
+                y += 10;
+                ctx.DrawText("Zidentyfikowane Ogniska:", SystemFonts.CreateFont("Arial", 12, FontStyle.Bold), textColor, new PointF(10, y));
+                y += 25;
+
+                foreach (var clusterId in riskClusters.OrderByDescending(id => id))
+                {
+                    string key = clusterId.ToString();
+                    double val = means.ContainsKey(key) ? means[key] : 0.0;
+
+                    Rgba32 color = GetColorBySeverity(val, maxBadNdvi);
+
+                    string label = $"Ognisko #{Math.Abs(clusterId)} (Średnia: {val:F2})";
+                    DrawLegendItem(ctx, color, label, ref y, font, textColor);
+                }
+            }
         });
 
         using var ms = new MemoryStream();
@@ -160,8 +238,11 @@ public static class ImageUtils
         return ms.ToArray();
     }
 
-    // --- 4. POMOCNICZE (List <-> Array) ---
-
+    /// <summary>
+    /// Funkcja konwertująca macierz typu double na listę list typu double
+    /// </summary>
+    /// <param name="array">Macierz do przekonwertowania</param>
+    /// <returns>Lista list z danymi macierzy</returns>
     public static List<List<double>> ConvertToNestedList(double[,] array)
     {
         int h = array.GetLength(0);
@@ -175,21 +256,11 @@ public static class ImageUtils
         }
         return list;
     }
-
-    public static List<List<double>> ConvertToNestedList(float[,] array)
-    {
-        int h = array.GetLength(0);
-        int w = array.GetLength(1);
-        var list = new List<List<double>>(h);
-        for (int y = 0; y < h; y++)
-        {
-            var row = new List<double>(w);
-            for (int x = 0; x < w; x++) row.Add(array[y, x]);
-            list.Add(row);
-        }
-        return list;
-    }
-
+    /// <summary>
+    /// Funkcja konwertująca listę list double na macierz typu double
+    /// </summary>
+    /// <param name="list">Lista list do przekonwertowania</param>
+    /// <returns>Macierz z danymi listy list</returns>
     public static double[,] ConvertFromNestedList(List<List<double>> list)
     {
         int h = list.Count;
@@ -201,135 +272,52 @@ public static class ImageUtils
         return arr;
     }
 
-    public static byte[] CreateRiskOverlayFromPoints(double[][] points, int[] labels, int width, int height)
+    #endregion
+
+    #region Private Methods
+    /// <summary>
+    /// Pomocnicza funkcja do rysowania elementów legendy
+    /// </summary>
+    /// <param name="ctx">Obiekt (biblioteka SixLabours) wykonujący akcje rysowania legendy</param>
+    /// <param name="boxColor">Kolor przyporządkowany danemu rekordowi</param>
+    /// <param name="text">Tekst dla danego rekordu</param>
+    /// <param name="y">Aktualna wysokość legendy (z każdym rekordem się zwiększa)</param>
+    /// <param name="font">Czcionka</param>
+    /// <param name="textColor">Kolor tekstu</param>
+    private static void DrawLegendItem(IImageProcessingContext ctx, Color boxColor, string text, ref int y, Font font, Color textColor)
     {
-        // Upscaling x6 dla lepszej jakości (tak jak w heatmapie)
-        int scale = 6;
-        int newW = width * scale;
-        int newH = height * scale;
-
-        using var image = new Image<Rgba32>(newW, newH);
-        image.Mutate(ctx => ctx.Fill(new Rgba32(0, 0, 0, 0))); // Przezroczyste tło
-
-        for (int i = 0; i < points.Length; i++)
+        ctx.Fill(boxColor, new RectangleF(20, y, 20, 20));
+        ctx.DrawText(text, font, textColor, new PointF(50, y + 2));
+        y += 30;
+    }
+    /// <summary>
+    /// Funkcja pomocnicza generująca kolor na podstawie średniego NDVI klastra
+    /// </summary>
+    /// <param name="meanNdvi">Średnie NDVI klastra</param>
+    /// <param name="maxThreshold">Maksymalne alarmujące NDVI</param>
+    /// <returns>Kolor w formacie RGB</returns>
+    /// <exception cref="ArgumentException"></exception>
+    private static Rgba32 GetColorBySeverity(double meanNdvi, double maxThreshold)
+    {
+        // WALIDACJA: Wymagamy podania poprawnego progu.
+        // Jeśli maxBadNdvi jest 0 lub ujemne (np. nieprzypisane), błąd.
+        if (maxThreshold <= 0.0001) // Używamy małej delty dla double
         {
-            int x = (int)points[i][0];
-            int y = (int)points[i][1];
-            int label = labels[i];
-
-            // Wybierz kolor na podstawie etykiety
-            Rgba32 color;
-            if (label == 0) color = new Rgba32(0, 255, 0, 100); // Zielone (dobre) - nie rysujemy nic (przezroczyste)
-            else if (label == 1) color = new Rgba32(255, 255, 0, 100); // Żółty (średnie)
-            else if (label == -1) color = new Rgba32(255, 0, 0, 100); // Szum z DBSCAN (Czerwony)
-            else
-            {
-                // Klastry z Pythona (ID < -1, np. -2, -3...)
-                // Generujemy odcienie czerwieni/fioletu dla różnych ognisk choroby
-                color = GetClusterColor(label);
-            }
-
-            // Rysuj powiększony piksel
-            for (int dy = 0; dy < scale; dy++)
-                for (int dx = 0; dx < scale; dx++)
-                    image[x * scale + dx, y * scale + dy] = color;
+            throw new ArgumentException(
+                "Parametr 'maxBadNdvi' jest wymagany i musi być większy od 0. Sprawdź konfigurację algorytmu.",
+                nameof(maxThreshold)
+            );
         }
 
-        using var ms = new MemoryStream();
-        image.SaveAsPng(ms);
-        return ms.ToArray();
+
+        double t = Math.Clamp(meanNdvi / maxThreshold, 0.0, 1.0);
+
+        byte r = (byte)(255 * t);
+        byte g = (byte)(42 * t);
+        byte b = (byte)(46 * t);
+
+        return new Rgba32(r, g, b, 200);
     }
 
-    // Pomocnicza do kolorów klastrów
-    private static Rgba32 GetClusterColor(int clusterId)
-    {
-        // clusterId z Pythona to np. 0, 1, 2... 
-        // Ale my w AnalysisService zrobiliśmy mapowanie, żeby nie gryzły się z 0 i 1 (dobry/średni).
-        // Załóżmy, że klastry to liczby ujemne < -1 lub duże dodatnie.
-
-        // Prosta paleta dla klastrów (ognisk choroby):
-        // Ciemna czerwień, Fiolet, Brąz
-        int intensity = Math.Abs(clusterId) * 30;
-        return new Rgba32((byte)(255 - (intensity % 100)), 0, (byte)((intensity * 2) % 255), 150);
-    }
-
-    // 2. Legenda dynamiczna (z klastrami)
-    public static byte[] CreateLegendWithClusters(Dictionary<string, double> medians, int[] presentClusters, bool darkMode) // 1. Dodajemy parametr
-    {
-        int w = 400, h = 300; // Ewentualnie można zwiększyć wysokość, jeśli klastrów jest dużo
-        using var image = new Image<Rgba32>(w, h);
-
-        // 2. Definiujemy kolory w zależności od trybu
-        // Ciemny szary (np. #2b2b2b) wygląda zazwyczaj lepiej niż czysty czarny
-        Color bgColor = darkMode ? Color.ParseHex("#2b2b2b") : Color.White;
-        Color textColor = darkMode ? Color.White : Color.Black;
-
-        // 3. Wypełniamy tło
-        image.Mutate(ctx => ctx.Fill(bgColor));
-
-        var font = SystemFonts.CreateFont("Arial", 12);
-        var titleFont = SystemFonts.CreateFont("Arial", 14, FontStyle.Bold);
-        int y = 20;
-
-        image.Mutate(ctx => {
-            // Tytuł - używamy dynamicznego textColor
-            ctx.DrawText("Legenda Ryzyka", titleFont, textColor, new PointF(10, y));
-            y += 30;
-
-            // Standardowe pozycje - przekazujemy textColor do metody pomocniczej
-            DrawLegendItem(ctx, Color.Green, "Zdrowe (Wysokie NDVI)", ref y, font, textColor);
-            DrawLegendItem(ctx, Color.Yellow, "Ostrzegawcze (Średnie NDVI)", ref y, font, textColor);
-            DrawLegendItem(ctx, Color.Red, "Zagrożone (Niskie NDVI / Szum)", ref y, font, textColor);
-
-            y += 10;
-            // Nagłówek sekcji klastrów
-            ctx.DrawText("Wykryte ogniska (DBSCAN):", SystemFonts.CreateFont("Arial", 12, FontStyle.Bold), textColor, new PointF(10, y));
-            y += 25;
-
-            // Klastry z Pythona
-            foreach (var clusterId in presentClusters.Distinct())
-            {
-                string key = clusterId.ToString();
-                double median = medians.ContainsKey(key) ? medians[key] : 0.0;
-
-                // Metoda GetClusterColor musi być dostępna w klasie (mieliśmy ją wcześniej)
-                Rgba32 color = GetClusterColor(clusterId);
-
-                DrawLegendItem(ctx, color, $"Ognisko #{clusterId} (Mediana: {median:F2})", ref y, font, textColor);
-            }
-        });
-
-        using var ms = new MemoryStream();
-        image.SaveAsPng(ms);
-        return ms.ToArray();
-    }
-
-    // === METODA POMOCNICZA (Zaktualizowana) ===
-    private static void DrawLegendItem(
-        IImageProcessingContext ctx,
-        Color boxColor,
-        string text,
-        ref int y,
-        Font font,
-        Color textColor) // Dodajemy parametr koloru tekstu
-    {
-        // Rysujemy kwadracik koloru
-        ctx.Fill(boxColor, new RectangleF(20, y, 20, 20));
-
-        // Opcjonalnie: Jeśli tryb jest ciemny, a kolor kwadracika też ciemny (np. czarny/granatowy),
-        // warto dodać jasną obwódkę:
-        // if (textColor == Color.White) ctx.Draw(Color.Gray, 1, new RectangleF(20, y, 20, 20));
-
-        // Rysujemy tekst odpowiednim kolorem
-        ctx.DrawText(text, font, textColor, new PointF(50, y + 2));
-
-        y += 30;
-    }
-
-    private static void DrawLegendItem(IImageProcessingContext ctx, Color color, string text, ref int y, Font font)
-    {
-        ctx.Fill(color, new RectangleF(20, y, 20, 20));
-        ctx.DrawText(text, font, Color.Black, new PointF(50, y + 2));
-        y += 30;
-    }
+    #endregion
 }

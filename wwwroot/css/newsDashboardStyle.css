@@ -7,7 +7,9 @@
 html, body {
     margin: 0;
     padding: 0;
-    height: 100%; /* Upewnij się, że body i html mają wysokość 100% */
+    min-height: 100vh; /* Upewnij się, że body i html mają wysokość 100% */
+    display: flex;
+    flex-direction: column;
 }
 
 .content {

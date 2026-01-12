@@ -1,140 +1,144 @@
-﻿body {
-    font-family: Arial, sans-serif;
-    background-color: #f8f8f8;
-    text-align: center;
+﻿/* =========================================
+   1. ZMIENNE (COLORS & SETTINGS)
+   ========================================= */
+:root {
+    /* Kolory podstawowe */
+    --bg-color: #f8f8f8;
+    --text-color: #000;
+    --container-bg: #ffffff;
+    /* Ramki i akcenty */
+    --frame-color: green;
+    --footer-bg: green;
+    --footer-text: white;
+    /* Gradient kafelków */
+    --tile-gradient-start: #004085;
+    --tile-gradient-end: #007BFF;
+    --tile-text: white;
+    /* Linia oddzielająca */
+    --separator-color: 0, 123, 255; /* RGB dla rgba */
 }
 
+/* =========================================
+   2. RESET I BAZA
+   ========================================= */
 html, body {
     margin: 0;
     padding: 0;
-    height: 100%; /* Upewnij się, że body i html mają wysokość 100% */
+    /* Zmieniamy height na min-height, żeby strona mogła rosnąć */
+    min-height: 100vh;
+    font-family: Arial, sans-serif;
+    background-color: var(--bg-color);
+    text-align: center;
+    /* KLUCZOWA POPRAWKA: Układ pionowy */
+    display: flex;
+    flex-direction: column;
 }
 
+/* =========================================
+   3. GŁÓWNY LAYOUT (.content)
+   ========================================= */
 .content {
-    border: 5px solid green;
+    /* Wygląd kontenera */
+    background-color: var(--container-bg);
+    border: 5px solid var(--frame-color);
+    border-radius: 15px;
+    /* Wymiary i pozycjonowanie */
     width: calc(100% - 100px);
+    margin: 20px 50px;
     min-height: calc(100vh - 120px);
     padding: 20px;
     box-sizing: border-box;
-    background-color: white;
-    border-radius: 15px;
-    margin: 20px 50px;
+    /* Flexbox layout */
     display: flex;
-    flex-direction: column; /* nagłówek na górze, kafelki pod spodem */
-    /* usuwamy align-items i justify-content! */
-    align-items: center;
+    flex-direction: column; /* Nagłówek na górze, kafelki pod spodem */
+    align-items: center; /* Wyśrodkowanie elementów w poziomie */
+    flex: 1;
 }
-
 
 footer {
-    background-color: green; /* Zielone tło */
-    color: white; /* Biały tekst */
-    text-align: center; /* Wyśrodkowanie tekstu */
-    padding: 15px; /* Wewnętrzny odstęp */
-    /*position: fixed; /* Przyklejenie stopki do dołu */
+    background-color: var(--footer-bg);
+    color: var(--footer-text);
+    text-align: center;
+    padding: 15px;
+    /* Pozycjonowanie */
+    width: 100%;
     bottom: 0;
-    left: 0; /* Przypięcie do lewej strony */
-    width: 100%; /* Pełna szerokość ekranu */
-    box-sizing: border-box; /* Zapobiega przesunięciom przez padding */
+    left: 0;
+    box-sizing: border-box;
 }
 
+/* =========================================
+   4. KOMPONENTY (NAGŁÓWEK, KONTENER, KAFELKI)
+   ========================================= */
 .title {
     font-size: 24px;
     margin-bottom: 20px;
     text-align: center;
-    flex: 0 0 auto;
+    flex: 0 0 auto; /* Nie rozciągaj ani nie zwężaj nagłówka */
 }
 
+/* Kontener na kafelki */
 #fields-container {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     align-content: flex-start;
-    gap: 15px;
     align-items: flex-start;
+    gap: 15px;
     padding: 40px 0;
-    position: relative;
+    position: relative; /* Dla pseudo-elementu ::after */
 }
 
+    /* Ozdobna linia na dole kontenera */
     #fields-container::after {
         content: "";
         position: absolute;
         bottom: 0;
         left: 0;
         width: 100%;
-        height: 2px; /* grubość linii */
-        background: linear-gradient(to right, rgba(0,123,255,0), /* przezroczysta na początku */
-        rgba(0,123,255,1), /* pełny kolor po środku */
-        rgba(0,123,255,0)); /* przezroczysta na końcu */
+        height: 2px;
+        background: linear-gradient( to right, rgba(var(--separator-color), 0), /* Przezroczysty */
+        rgba(var(--separator-color), 1), /* Pełny kolor */
+        rgba(var(--separator-color), 0) /* Przezroczysty */
+        );
     }
 
-
-/* 1 kafelek */
-/*@media (max-width: 190px) {
-    #fields-container {
-        width: 190px;
-    }
-}*/
-
-/* 2 kafelki */
-/*@media (min-width: 191px) and (max-width: 395px) {
-    #fields-container {
-        width: calc(2 * 190px + 1 * 15px);*/ /* 395px */
-    /*}
-}*/
-
-/* 3 kafelki */
-/*@media (min-width: 396px) and (max-width: 590px) {
-    #fields-container {
-        width: calc(3 * 190px + 2 * 15px);*/ /* 590px */
-    /*}
-}*/
-
-/* 4 kafelki */
-/*@media (min-width: 591px) and (max-width: 785px) {
-    #fields-container {
-        width: calc(4 * 190px + 3 * 15px);*/ /* 785px */
-    /*}
-}*/
-
-/* 5 kafelków */
-/*@media (min-width: 786px) and (max-width: 980px) {
-    #fields-container {
-        width: calc(5 * 190px + 4 * 15px);*/ /* 980px */
-    /*}
-}*/
-
-/* 6 kafelków (max) */
-/*@media (min-width: 981px) {
-    #fields-container {
-        width: calc(6 * 190px + 5 * 15px);*/ /* 1175px */
-        /*max-width: 100%;
-    }
-}*/
-
+/* Pojedynczy kafelek pola */
 .field-tile {
+    /* Wymiary */
     flex: 0 0 150px;
-    height: 120px;
-    background: linear-gradient(135deg, #004085, #007BFF); /* ciemniejszy niebieski gradient */
     max-width: 190px;
-    color: white;
-    padding: 20px;
-    align-items: center; /* wyśrodkowanie w pionie */
-    text-align: center;
+    height: 120px;
+    /* Wygląd */
+    background: linear-gradient(135deg, var(--tile-gradient-start), var(--tile-gradient-end));
+    color: var(--tile-text);
     border-radius: 5px;
+    /* Tekst i layout wewnętrzny */
+    padding: 20px;
+    text-align: center;
+    display: flex; /* Aby wyśrodkować tekst pionowo, jeśli trzeba */
+    align-items: flex-start;
+    justify-content: center; /* Dodano dla pewności wyśrodkowania tekstu */
+    /* Interakcja */
     cursor: pointer;
     transition: transform 0.2s ease, background-color 0.2s ease;
 }
+
     .field-tile:hover {
         transform: scale(1.05);
     }
 
+/* =========================================
+   5. DARK MODE
+   ========================================= */
 .dark-theme body {
-    background-color: #202123; /* szare tło całej strony */
-    color: #e5e5e5; /* jasny tekst */
+    background-color: #202123;
+    color: #e5e5e5;
 }
 
 .dark-theme .content {
-    background-color: #2a2b2e; /* ciemniejsze tło kontenera (GPT-style) */
-    color: #e5e5e5; /* jasny tekst wewnątrz contentu */
+    background-color: #2a2b2e;
+    color: #e5e5e5;
+    border-color: var(--frame-color); /* Ramka pozostaje zielona */
 }
+

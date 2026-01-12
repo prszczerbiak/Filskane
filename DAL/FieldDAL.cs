@@ -1,43 +1,52 @@
-﻿namespace WebApplication1.DAL;
-
-using System;
-using System.Collections.Generic;
-using System.Data;
+﻿using System.Data;
 using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
 using Oracle.ManagedDataAccess.Client;
 using Oracle.ManagedDataAccess.Types;
 using WebApplication1.Models;
 using WebApplication1.Utils;
 
+namespace WebApplication1.DAL;
+/// <summary>
+/// Warstwa dostępu do danych odpowiedzialna za operacje na polach uprawnych (CRUD, słowniki, przypisywanie upraw).
+/// </summary>
 public class FieldDAL : BaseDAL
 {
     public FieldDAL(IConfiguration configuration) : base(configuration)
     {
     }
 
-    // ==============================================================================
-    // CZĘŚĆ 1: ZARZĄDZANIE POLAMI (CRUD)
-    // ==============================================================================
-
+    /// <summary>
+    /// Tworzy nowe pole uprawne w bazie danych i zwraca jego ID.
+    /// </summary>
+    /// <param name="username">Nazwa właściciela pola.</param>
+    /// <param name="name">Nazwa pola.</param>
+    /// <param name="geojson">Geometria w formacie GeoJSON.</param>
+    /// <param name="centerX">Współrzędna X środka pola.</param>
+    /// <param name="centerY">Współrzędna Y środka pola.</param>
+    /// <param name="area">Powierzchnia w m2.</param>
+    /// <param name="complex">Kategoria kompleksu glebowego.</param>
+    /// <param name="type">Typ gleby.</param>
+    /// <param name="substrate">Podłoże glebowe.</param>
+    /// <returns>ID nowo utworzonego pola.</returns>
     public async Task<int> SaveFieldAsync(string username, string name, string geojson, double centerX, double centerY, double area, string complex, string type, string substrate)
     {
         await using var conn = CreateConnection();
         await conn.OpenAsync();
 
-        string sql = @"INSERT INTO FIELDS (
-                            FIELD_NAME, CENTER_LONGITUDE, CENTER_LATITUDE, USER_ID, 
-                            GEO_JSON, AREA_M2, SOIL_COMPLEX, SOIL_TYPE, SOIL_SUBSTRATE
-                       )
-                       VALUES (
-                            :name, :centerX, :centerY, 
-                            (SELECT USER_ID FROM USERS WHERE USERNAME = :username), 
-                            :geojson, :area, :soilComplex, :soilType, :soilSubstrate
-                       )
-                       RETURNING FIELD_ID INTO :newId";
+        const string sql = @"
+            INSERT INTO FIELDS (
+                FIELD_NAME, CENTER_LONGITUDE, CENTER_LATITUDE, USER_ID, 
+                GEO_JSON, AREA_M2, SOIL_COMPLEX, SOIL_TYPE, SOIL_SUBSTRATE
+            )
+            VALUES (
+                :name, :centerX, :centerY, 
+                (SELECT USER_ID FROM USERS WHERE USERNAME = :username), 
+                :geojson, :area, :soilComplex, :soilType, :soilSubstrate
+            )
+            RETURNING FIELD_ID INTO :newId";
 
         await using var cmd = new OracleCommand(sql, conn);
+
         cmd.Parameters.Add("name", OracleDbType.Varchar2).Value = name;
         cmd.Parameters.Add("centerX", OracleDbType.Double).Value = centerX;
         cmd.Parameters.Add("centerY", OracleDbType.Double).Value = centerY;
@@ -54,8 +63,11 @@ public class FieldDAL : BaseDAL
         try
         {
             await cmd.ExecuteNonQueryAsync();
-            if (newIdParam.Value is OracleDecimal oraDec && !oraDec.IsNull) return oraDec.ToInt32();
-            throw new Exception("Nie udało się pobrać ID nowego pola.");
+
+            if (newIdParam.Value is OracleDecimal oraDec && !oraDec.IsNull)
+                return oraDec.ToInt32();
+
+            throw new InvalidOperationException("Nie udało się pobrać ID nowego pola.");
         }
         catch (OracleException ex)
         {
@@ -63,6 +75,11 @@ public class FieldDAL : BaseDAL
         }
     }
 
+    /// <summary>
+    /// Pobiera listę wszystkich pól należących do użytkownika (wersja skrócona).
+    /// </summary>
+    /// <param name="username">Nazwa użytkownika.</param>
+    /// <returns>Lista obiektów DTO z podstawowymi danymi pól.</returns>
     public async Task<List<FieldShortDto>> GetUserFieldsAsync(string username)
     {
         var fields = new List<FieldShortDto>();
@@ -73,10 +90,11 @@ public class FieldDAL : BaseDAL
             await using var conn = CreateConnection();
             await conn.OpenAsync();
 
-            string sql = @"SELECT f.FIELD_ID, f.FIELD_NAME, f.CENTER_LONGITUDE, f.CENTER_LATITUDE, f.GEO_JSON
-                           FROM FIELDS f
-                           JOIN USERS u ON f.USER_ID = u.USER_ID
-                           WHERE u.USERNAME = :username";
+            const string sql = @"
+                SELECT f.FIELD_ID, f.FIELD_NAME, f.CENTER_LONGITUDE, f.CENTER_LATITUDE, f.GEO_JSON
+                FROM FIELDS f
+                JOIN USERS u ON f.USER_ID = u.USER_ID
+                WHERE u.USERNAME = :username";
 
             await using var cmd = new OracleCommand(sql, conn);
             cmd.Parameters.Add("username", OracleDbType.Varchar2).Value = username;
@@ -100,6 +118,11 @@ public class FieldDAL : BaseDAL
         }
     }
 
+    /// <summary>
+    /// Pobiera uproszczoną listę pól (ID + Nazwa) do wyświetlenia w menu.
+    /// </summary>
+    /// <param name="username">Nazwa użytkownika, dla którego pobieramy listę.</param>
+    /// <returns>Lista prostych obiektów DTO zawierających tylko ID i nazwę pola.</returns>
     public async Task<List<FieldListItemDto>> GetFieldListAsync(string username)
     {
         var list = new List<FieldListItemDto>();
@@ -110,14 +133,16 @@ public class FieldDAL : BaseDAL
             await using var conn = CreateConnection();
             await conn.OpenAsync();
 
-            string sql = @"SELECT f.FIELD_ID, f.FIELD_NAME
-                           FROM FIELDS f
-                           JOIN USERS u ON f.USER_ID = u.USER_ID
-                           WHERE u.USERNAME = :username
-                           ORDER BY f.FIELD_NAME";
+            const string sql = @"
+                SELECT f.FIELD_ID, f.FIELD_NAME
+                FROM FIELDS f
+                JOIN USERS u ON f.USER_ID = u.USER_ID
+                WHERE u.USERNAME = :username
+                ORDER BY f.FIELD_NAME";
 
             await using var cmd = new OracleCommand(sql, conn);
             cmd.Parameters.Add("username", OracleDbType.Varchar2).Value = username;
+
             await using var reader = await cmd.ExecuteReaderAsync();
 
             while (await reader.ReadAsync())
@@ -129,25 +154,35 @@ public class FieldDAL : BaseDAL
             }
             return list;
         }
-        catch (Exception ex) { throw new Exception($"Błąd listy pól: {ex.Message}", ex); }
+        catch (Exception ex)
+        {
+            throw new Exception($"Błąd listy pól: {ex.Message}", ex);
+        }
     }
 
+    /// <summary>
+    /// Pobiera szczegółowe informacje o polu na podstawie ID, weryfikując własność.
+    /// </summary>
+    /// <param name="username">Nazwa użytkownika próbującego uzyskać dostęp.</param>
+    /// <param name="fieldId">Identyfikator pola.</param>
+    /// <returns>Obiekt szczegółowy pola lub null, jeśli pole nie istnieje/nie należy do użytkownika.</returns>
     public async Task<FieldDetailDto?> GetUserFieldByIdAsync(string username, int fieldId)
     {
         await using var conn = CreateConnection();
         await conn.OpenAsync();
 
-        string sql = @"SELECT f.FIELD_ID, f.FIELD_NAME, f.CROP_ID, p.PLANT_NAME, f.PLANT_STATE, 
-                              g.CYCLE_NAME, f.SOWING_DATE, sc.COMPLEX_NAME, st.TYPE_NAME, 
-                              ss.SUBSTRATE_NAME, f.AREA_M2, f.GEO_JSON
-                       FROM FIELDS f
-                       LEFT JOIN PLANTS p ON f.CROP_ID = p.PLANT_ID
-                       LEFT JOIN GROWTH_CYCLES g ON f.PLANT_STATE = g.CYCLE_ID
-                       LEFT JOIN SOIL_COMPLEXES sc ON f.SOIL_COMPLEX = sc.COMPLEX_CODE
-                       LEFT JOIN SOIL_TYPES st ON f.SOIL_TYPE = st.TYPE_CODE
-                       LEFT JOIN SOIL_SUBSTRATES ss ON f.SOIL_SUBSTRATE = ss.SUBSTRATE_CODE
-                       JOIN USERS u ON f.USER_ID = u.USER_ID 
-                       WHERE f.FIELD_ID = :fieldId AND u.USERNAME = :username";
+        const string sql = @"
+            SELECT f.FIELD_ID, f.FIELD_NAME, f.CROP_ID, p.PLANT_NAME, f.PLANT_STATE, 
+                    g.CYCLE_NAME, f.SOWING_DATE, sc.COMPLEX_NAME, st.TYPE_NAME, 
+                    ss.SUBSTRATE_NAME, f.AREA_M2, f.GEO_JSON
+            FROM FIELDS f
+            LEFT JOIN PLANTS p ON f.CROP_ID = p.PLANT_ID
+            LEFT JOIN GROWTH_CYCLES g ON f.PLANT_STATE = g.CYCLE_ID
+            LEFT JOIN SOIL_COMPLEXES sc ON f.SOIL_COMPLEX = sc.COMPLEX_CODE
+            LEFT JOIN SOIL_TYPES st ON f.SOIL_TYPE = st.TYPE_CODE
+            LEFT JOIN SOIL_SUBSTRATES ss ON f.SOIL_SUBSTRATE = ss.SUBSTRATE_CODE
+            JOIN USERS u ON f.USER_ID = u.USER_ID 
+            WHERE f.FIELD_ID = :fieldId AND u.USERNAME = :username";
 
         await using var cmd = new OracleCommand(sql, conn);
         cmd.Parameters.Add("fieldId", OracleDbType.Int32).Value = fieldId;
@@ -159,7 +194,7 @@ public class FieldDAL : BaseDAL
             if (await reader.ReadAsync())
             {
                 string geoJson = reader["GEO_JSON"]?.ToString() ?? "";
-                string bbox = GeoUtils.GetBboxFromGeoJson(geoJson)?.ToString() ?? "";
+                Bbox? bbox = GeoUtils.GetBboxFromGeoJson(geoJson);
 
                 return new FieldDetailDto(
                     Convert.ToInt32(reader["FIELD_ID"]),
@@ -173,55 +208,91 @@ public class FieldDAL : BaseDAL
                     GetSafeString(reader["TYPE_NAME"]),
                     GetSafeString(reader["SUBSTRATE_NAME"]),
                     Convert.ToDouble(reader["AREA_M2"] is DBNull ? 0 : reader["AREA_M2"]),
-                    geoJson, bbox
+                    geoJson,
+                    bbox
                 );
             }
             return null;
         }
-        catch (Exception ex) { throw new Exception($"Błąd szczegółów pola: {ex.Message}", ex); }
+        catch (Exception ex)
+        {
+            throw new Exception($"Błąd szczegółów pola: {ex.Message}", ex);
+        }
     }
 
-    public async Task SaveFieldChangesAsync(int fieldId, UpdateFieldRequest dto)
+    /// <summary>
+    /// Aktualizuje dane pola (uprawa, data zasiewu) i przelicza fazę wzrostu.
+    /// </summary>
+    /// <param name="username">Nazwa użytkownika.</param>
+    /// <param name="fieldId">Identyfikator pola.</param>
+    /// <param name="dto">Obiekt zawierający nowe dane (CropId, SowingDate).</param>
+    public async Task SaveFieldChangesAsync(string username, int fieldId, UpdateFieldRequest dto)
     {
         await using var conn = CreateConnection();
         await conn.OpenAsync();
+
         using var cmd = conn.CreateCommand();
         cmd.BindByName = true;
 
         bool canCalculateCycle = (dto.CropId > 0) && (dto.SowingDate.HasValue);
         StringBuilder sql = new StringBuilder();
+
         sql.Append("UPDATE FIELDS SET CROP_ID = :crop, SOWING_DATE = :dateSow, ");
 
         if (canCalculateCycle)
         {
-            sql.Append(@"PLANT_STATE = (SELECT CYCLE_ID FROM PLANT_STATES WHERE PLANT_ID = :cropSub 
-                         AND :dateSowSub + MIN_DAYS <= SYSDATE AND :dateSowSub + MAX_DAYS >= SYSDATE FETCH FIRST 1 ROWS ONLY) ");
+            // Automatyczne wyliczanie ID cyklu na podstawie daty zasiewu i bieżącej daty
+            sql.Append(@"
+                PLANT_STATE = (
+                    SELECT CYCLE_ID FROM PLANT_STATES 
+                    WHERE PLANT_ID = :cropSub 
+                        AND :dateSowSub + MIN_DAYS <= SYSDATE 
+                        AND :dateSowSub + MAX_DAYS >= SYSDATE 
+                    FETCH FIRST 1 ROWS ONLY
+                ) ");
         }
         else
         {
             sql.Append("PLANT_STATE = NULL ");
         }
-        sql.Append("WHERE FIELD_ID = :fieldId");
+
+        sql.Append(@"
+            WHERE FIELD_ID = :fieldId 
+                AND USER_ID = (SELECT USER_ID FROM USERS WHERE USERNAME = :username)");
 
         cmd.CommandText = sql.ToString();
+
         cmd.Parameters.Add("crop", OracleDbType.Int32).Value = (dto.CropId > 0) ? dto.CropId : DBNull.Value;
         cmd.Parameters.Add("dateSow", OracleDbType.Date).Value = dto.SowingDate.HasValue ? dto.SowingDate.Value : DBNull.Value;
-        cmd.Parameters.Add("fieldId", OracleDbType.Int32).Value = fieldId;
 
         if (canCalculateCycle)
         {
             cmd.Parameters.Add("cropSub", OracleDbType.Int32).Value = dto.CropId;
-            cmd.Parameters.Add("dateSowSub", OracleDbType.Date).Value = dto.SowingDate.Value;
+            cmd.Parameters.Add("dateSowSub", OracleDbType.Date).Value = dto.SowingDate!.Value;
         }
 
-        if (await cmd.ExecuteNonQueryAsync() == 0) throw new Exception("Nie znaleziono pola.");
+        cmd.Parameters.Add("fieldId", OracleDbType.Int32).Value = fieldId;
+        cmd.Parameters.Add("username", OracleDbType.Varchar2).Value = username;
+
+        if (await cmd.ExecuteNonQueryAsync() == 0)
+            throw new KeyNotFoundException("Nie znaleziono pola lub brak uprawnień.");
     }
 
+    /// <summary>
+    /// Usuwa pole należące do wskazanego użytkownika.
+    /// </summary>
+    /// <param name="username">Nazwa użytkownika.</param>
+    /// <param name="fieldId">ID pola do usunięcia.</param>
     public async Task DeleteFieldAsync(string username, int fieldId)
     {
         await using var conn = CreateConnection();
         await conn.OpenAsync();
-        string sql = "DELETE FROM FIELDS WHERE FIELD_ID = :fieldId AND USER_ID = (SELECT USER_ID FROM USERS WHERE USERNAME = :username)";
+
+        const string sql = @"
+            DELETE FROM FIELDS 
+            WHERE FIELD_ID = :fieldId 
+                AND USER_ID = (SELECT USER_ID FROM USERS WHERE USERNAME = :username)";
+
         await using var cmd = new OracleCommand(sql, conn);
         cmd.Parameters.Add("fieldId", OracleDbType.Int32).Value = fieldId;
         cmd.Parameters.Add("username", OracleDbType.Varchar2).Value = username;
@@ -230,16 +301,18 @@ public class FieldDAL : BaseDAL
             throw new KeyNotFoundException($"Pole {fieldId} nie istnieje lub brak uprawnień.");
     }
 
-    // ==============================================================================
-    // CZĘŚĆ 2: SŁOWNIKI (PRZENIESIONE Z DictionaryDAL)
-    // ==============================================================================
-
+    /// <summary>
+    /// Pobiera słownik dostępnych roślin uprawnych.
+    /// </summary>
+    /// <returns>Lista roślin dostępnych w systemie.</returns>
     public async Task<List<PlantDto>> GetPlantsAsync()
     {
         var list = new List<PlantDto>();
         await using var conn = CreateConnection();
         await conn.OpenAsync();
-        string sql = "SELECT PLANT_ID, PLANT_NAME FROM PLANTS ORDER BY PLANT_NAME";
+
+        const string sql = "SELECT PLANT_ID, PLANT_NAME FROM PLANTS ORDER BY PLANT_NAME";
+
         await using var cmd = new OracleCommand(sql, conn);
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
@@ -249,29 +322,53 @@ public class FieldDAL : BaseDAL
         return list;
     }
 
+    /// <summary>
+    /// Pobiera progi NDVI dla poszczególnych cykli wzrostu.
+    /// </summary>
+    /// <returns>Lista progów NDVI dla cykli.</returns>
     public async Task<List<ThresholdDto>> GetThresholdsAsync()
     {
         var list = new List<ThresholdDto>();
         await using var conn = CreateConnection();
         await conn.OpenAsync();
-        string sql = "SELECT CYCLE_ID, MIN_NDVI, MAX_NDVI FROM GROWTH_CYCLES";
+
+        const string sql = "SELECT CYCLE_ID, MIN_NDVI, MAX_NDVI FROM GROWTH_CYCLES";
+
         await using var cmd = new OracleCommand(sql, conn);
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
-            list.Add(new ThresholdDto(Convert.ToInt32(reader["CYCLE_ID"]), Convert.ToDouble(reader["MIN_NDVI"]), Convert.ToDouble(reader["MAX_NDVI"])));
+            list.Add(new ThresholdDto(
+                Convert.ToInt32(reader["CYCLE_ID"]),
+                Convert.ToDouble(reader["MIN_NDVI"]),
+                Convert.ToDouble(reader["MAX_NDVI"])
+            ));
         }
         return list;
     }
 
-    public async Task<CycleDto?> GetCycleByIdAsync(int fieldId)
+    /// <summary>
+    /// Pobiera informacje o aktualnym cyklu wzrostu dla pola.
+    /// </summary>
+    /// <param name="username">Nazwa użytkownika (właściciela).</param>
+    /// <param name="fieldId">Identyfikator pola.</param>
+    /// <returns>Obiekt z informacjami o cyklu lub null.</returns>
+    public async Task<CycleDto?> GetCycleByIdAsync(string username, int fieldId)
     {
         await using var conn = CreateConnection();
         await conn.OpenAsync();
-        string sql = @"SELECT g.CYCLE_ID, g.CYCLE_NAME FROM FIELDS f 
-                       JOIN GROWTH_CYCLES g ON f.PLANT_STATE = g.CYCLE_ID WHERE f.FIELD_ID = :fieldId";
+
+        const string sql = @"
+            SELECT g.CYCLE_ID, g.CYCLE_NAME 
+            FROM FIELDS f 
+            JOIN GROWTH_CYCLES g ON f.PLANT_STATE = g.CYCLE_ID 
+            JOIN USERS u ON f.USER_ID = u.USER_ID
+            WHERE f.FIELD_ID = :fieldId AND u.USERNAME = :username";
+
         await using var cmd = new OracleCommand(sql, conn);
         cmd.Parameters.Add("fieldId", OracleDbType.Int32).Value = fieldId;
+        cmd.Parameters.Add("username", OracleDbType.Varchar2).Value = username;
+
         await using var reader = await cmd.ExecuteReaderAsync();
         if (await reader.ReadAsync())
         {

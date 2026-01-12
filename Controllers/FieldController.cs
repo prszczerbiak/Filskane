@@ -1,247 +1,349 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using WebApplication1.Models;   // Tu są Twoje rekordy (DTO)
-using WebApplication1.Services; // Tu są Twoje serwisy
+using WebApplication1.Models;
+using WebApplication1.Services;
 
-namespace WebApplication1.Controllers
+namespace WebApplication1.Controllers;
+
+/// <summary>
+/// Kontroler obsługujący szczegółowe operacje na polach, skanach satelitarnych i analizie NDVI.
+/// </summary>
+[ApiController]
+[Route("api/field")]
+[Authorize]
+public class FieldController : ControllerBase
 {
-    [ApiController]
-    [Route("api/field")]
-    [Authorize]
-    public class FieldController : ControllerBase
+    private readonly FieldService _fieldService;
+    private readonly AnalysisService _analysisService;
+    private readonly ILogger<FieldController> _logger;
+
+    public FieldController(FieldService fieldService, AnalysisService analysisService, ILogger<FieldController> logger)
     {
-        private readonly FieldService _fieldService;
-        private readonly AnalysisService _analysisService;
+        _fieldService = fieldService;
+        _analysisService = analysisService;
+        _logger = logger;
+    }
 
-        public FieldController(FieldService fieldService, AnalysisService analysisService)
+    private string GetCurrentUsername() => User.Identity?.Name ?? string.Empty;
+
+    /// <summary>
+    /// Pobiera szczegółowe informacje o wybranym polu.
+    /// </summary>
+    /// <param name="fieldId">Identyfikator pola.</param>
+    /// <returns>Obiekt ze szczegółami pola (nazwa, uprawa, powierzchnia itp.).</returns>
+    [HttpGet("getData/{fieldId}")]
+    public async Task<IActionResult> GetFieldInfo(int fieldId)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        try
         {
-            _fieldService = fieldService;
-            _analysisService = analysisService;
-        }
-
-        // Helper do wyciągania loginu
-        private string GetCurrentUsername() => User.Identity?.Name ?? string.Empty;
-
-        // ==========================================
-        // 1. ZARZĄDZANIE POLEM (CRUD)
-        // ==========================================
-
-        [HttpGet("getData/{fieldId}")]
-        public async Task<IActionResult> GetFieldInfo(int fieldId)
-        {
-            var username = GetCurrentUsername();
-            if (string.IsNullOrEmpty(username)) return Unauthorized();
-
-            // Zmiana: _db -> _fieldService
             var field = await _fieldService.GetFieldDetailsAsync(username, fieldId);
-
-            if (field == null) return NotFound("Nie znaleziono pola");
-
+            if (field == null)
+            {
+                _logger.LogWarning("Użytkownik {Username} próbował pobrać nieistniejące (lub cudze) pole {FieldId}", username, fieldId);
+                return NotFound("Nie znaleziono pola");
+            }
             return Ok(field);
         }
-
-        [HttpPut("update/{fieldId}")]
-        public async Task<IActionResult> UpdateFieldInfo(int fieldId, [FromBody] UpdateFieldRequest request)
+        catch (Exception ex)
         {
-            var username = GetCurrentUsername();
-            if (string.IsNullOrEmpty(username)) return Unauthorized();
-
-            try
-            {
-                Console.WriteLine(request.CropId);
-                // Zmiana: _db -> _fieldService
-                await _fieldService.UpdateFieldAsync(fieldId, request);
-                return Ok(new { success = true });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { error = ex.Message });
-            }
+            _logger.LogError(ex, "Błąd pobierania szczegółów pola {FieldId}", fieldId);
+            return StatusCode(500);
         }
+    }
 
-        [HttpGet("getCycle/{fieldId}")]
-        public async Task<IActionResult> GetCycle(int fieldId)
+    /// <summary>
+    /// Aktualizuje dane podstawowe pola (np. nazwa, typ uprawy).
+    /// </summary>
+    /// <param name="fieldId">ID pola.</param>
+    /// <param name="request">Nowe dane pola.</param>
+    /// <returns>Status operacji.</returns>
+    [HttpPut("update/{fieldId}")]
+    public async Task<IActionResult> UpdateFieldInfo(int fieldId, [FromBody] UpdateFieldRequest request)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        try
         {
-            // Zmiana: _db -> _fieldService
-            var cycle = await _fieldService.GetCycleAsync(fieldId);
-
-            //if (cycle == null) return NotFound(new { error = "Nie znaleziono cyklu" });
-
-            return Ok(cycle);
+            await _fieldService.UpdateFieldAsync(username, fieldId, request);
+            _logger.LogInformation("Zaktualizowano pole {FieldId} przez {Username}", fieldId, username);
+            return Ok(new { success = true });
         }
-
-        [HttpGet("getPlantsList")]
-        public async Task<IActionResult> GetPlantsList()
+        catch (Exception ex)
         {
-            // Zmiana: _db -> _fieldService
-            var plants = await _fieldService.GetAllPlantsAsync();
-            return Ok(plants);
+            _logger.LogError(ex, "Błąd aktualizacji pola {FieldId}", fieldId);
+            return BadRequest(new { error = ex.Message });
         }
+    }
 
-        // ==========================================
-        // 2. OBRAZY I SKANY (TIFF -> PNG)
-        // ==========================================
+    /// <summary>
+    /// Pobiera informacje o cyklu uprawowym dla danego pola.
+    /// </summary>
+    /// <param name="fieldId">ID pola.</param>
+    /// <returns>Obiekt cyklu uprawowego.</returns>
+    [HttpGet("getCycle/{fieldId}")]
+    public async Task<IActionResult> GetCycle(int fieldId)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
 
-        [HttpPost("latestScan/{fieldId}")]
-        public async Task<IActionResult> GetLatestScan(int fieldId, [FromBody] ScanRequestDto request)
+        var cycle = await _fieldService.GetCycleAsync(username, fieldId);
+        return Ok(cycle);
+    }
+
+    /// <summary>
+    /// Pobiera słownik dostępnych roślin i upraw.
+    /// </summary>
+    /// <returns>Lista dostępnych roślin.</returns>
+    [HttpGet("getPlantsList")]
+    public async Task<IActionResult> GetPlantsList()
+    {
+        var plants = await _fieldService.GetAllPlantsAsync();
+        return Ok(plants);
+    }
+
+    /// <summary>
+    /// Generuje wizualizację (PNG) najnowszego dostępnego skanu dla pola.
+    /// </summary>
+    /// <param name="fieldId">ID pola.</param>
+    /// <param name="request">Opcjonalnie GeoJSON do przycięcia obrazu.</param>
+    /// <returns>Plik obrazu (image/png) oraz data skanu w nagłówku 'X-Scan-Date'.</returns>
+    [HttpPost("latestScan/{fieldId}")]
+    public async Task<IActionResult> GetLatestScan(int fieldId, [FromBody] ScanRequestDto request)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        try
         {
-            var username = GetCurrentUsername();
-            if (string.IsNullOrEmpty(username)) return Unauthorized();
+            var result = await _analysisService.GetVisualizedScanAsync(username, fieldId, null, request.Geojson);
 
-            try
+            if (result.PngBytes == null)
             {
-                // Cała magia (pobranie z bazy + konwersja + rysowanie) dzieje się w serwisie
-                // fieldId: podajemy, scanId: null (bo chcemy najnowszy)
-                var result = await _analysisService.GetVisualizedScanAsync(fieldId, null, request.Geojson);
-
-                if (result.PngBytes == null)
-                {
-                    Response.Headers.Append("X-Scan-Date", "Brak danych");
-                    return NoContent();
-                }
-
-                Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
-
-                // Zwracamy gotowy plik PNG
-                return File(result.PngBytes, "image/png");
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { error = ex.Message });
-            }
-        }
-
-        [HttpPost("imageById/{scanId}")]
-        public async Task<IActionResult> GetScanById(int scanId, [FromBody] ScanRequestDto request)
-        {
-            var username = GetCurrentUsername();
-            if (string.IsNullOrEmpty(username)) return Unauthorized();
-
-            try
-            {
-                // fieldId: 0 (nieistotne, bo szukamy po ID skanu), scanId: podajemy
-                var result = await _analysisService.GetVisualizedScanAsync(0, scanId, request.Geojson);
-
-                if (result.PngBytes == null) return NoContent();
-
-                Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
-                return File(result.PngBytes, "image/png");
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { error = ex.Message });
-            }
-        }
-
-        [HttpPost("uploadScan/{fieldId}")]
-        public async Task<IActionResult> UploadScan(int fieldId, [FromForm] UpdateTiffsDto data)
-        {
-            var username = GetCurrentUsername();
-            if (string.IsNullOrEmpty(username)) return Unauthorized();
-
-            if (data.Zip == null || data.Zip.Length == 0)
-                return BadRequest("Nie przesłano pliku ZIP.");
-
-            try
-            {
-                // Kontroler tylko przekazuje plik. 
-                // GDAL, rozpakowywanie i zapis do Oracle dzieje się w serwisie.
-                await _analysisService.ProcessAndSaveScanAsync(fieldId, data);
-
-                return Ok(new { message = "Skan przetworzony i zapisany pomyślnie." });
-            }
-            catch (Exception ex)
-            {
-                // Łapiemy błędy walidacji (np. "Brakuje pasm") lub błędy GDAL
-                return BadRequest(new { error = ex.Message });
-            }
-        }
-
-        [HttpGet("getScansHistory/{fieldId}")]
-        public async Task<IActionResult> GetScansHistory(int fieldId)
-        {
-            // Zmiana: _db -> _fieldService
-            var scans = await _fieldService.GetScansHistoryAsync(fieldId);
-            return Ok(scans);
-        }
-
-        [HttpDelete("deleteScan/{scanId}")]
-        public async Task<IActionResult> DeleteScan(int scanId)
-        {
-            // Zmiana: _db -> _fieldService
-            var deleted = await _fieldService.DeleteScanAsync(scanId);
-            if (!deleted) return NotFound(new { error = "Skan nie istnieje" });
-
-            return Ok(new { message = "Skan został usunięty" });
-        }
-
-        // ==========================================
-        // 3. DANE NDVI I ANALIZA RYZYKA
-        // ==========================================
-
-        [HttpGet("latestNDVIData/{fieldId}")]
-        public async Task<IActionResult> GetLatestNDVIData(int fieldId)
-        {
-            // Pobieramy surowe dane liczbowe (macierz) dla wykresów JS
-            var result = await _analysisService.GetNdviDataAsync(fieldId, null);
-
-            if (result.Data == null)
-            {
+                _logger.LogInformation("Brak skanów dla pola {FieldId}", fieldId);
                 Response.Headers.Append("X-Scan-Date", "Brak danych");
                 return NoContent();
             }
 
             Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
-            return Ok(result.Data); // Zwraca JSON: { ndvi: [[0.1, 0.2]...], fieldBbox: "..." }
+            return File(result.PngBytes, "image/png");
         }
-
-        [HttpGet("NDVIDataById/{scanId}")]
-        public async Task<IActionResult> GetNDVIDataById(int scanId)
+        catch (Exception ex)
         {
-            var result = await _analysisService.GetNdviDataAsync(0, scanId);
+            _logger.LogError(ex, "Błąd wizualizacji najnowszego skanu dla pola {FieldId}", fieldId);
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Generuje wizualizację konkretnego skanu na podstawie jego ID.
+    /// </summary>
+    /// <param name="scanId">ID skanu.</param>
+    /// <param name="request">Opcjonalnie GeoJSON do przycięcia.</param>
+    /// <returns>Plik obrazu (image/png).</returns>
+    [HttpPost("imageById/{scanId}")]
+    public async Task<IActionResult> GetScanById(int scanId, [FromBody] ScanRequestDto request)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        try
+        {
+            var result = await _analysisService.GetVisualizedScanAsync(username, 0, scanId, request.Geojson);
+            if (result.PngBytes == null) return NoContent();
+
+            Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
+            return File(result.PngBytes, "image/png");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd wizualizacji skanu {ScanId}", scanId);
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Przesyła i przetwarza nowy plik skanu (ZIP z plikami TIFF).
+    /// </summary>
+    /// <param name="fieldId">ID pola, do którego przypisany jest skan.</param>
+    /// <param name="data">Formularz z plikiem ZIP.</param>
+    /// <returns>Komunikat o sukcesie.</returns>
+    [HttpPost("uploadScan/{fieldId}")]
+    public async Task<IActionResult> UploadScan(int fieldId, [FromForm] UpdateTiffsDto data)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        if (data.Zip == null || data.Zip.Length == 0)
+            return BadRequest("Nie przesłano pliku ZIP.");
+
+        _logger.LogInformation("Rozpoczęto upload skanu dla pola {FieldId} przez {Username}", fieldId, username);
+
+        try
+        {
+            await _analysisService.ProcessAndSaveScanAsync(username, fieldId, data);
+            _logger.LogInformation("Pomyślnie przetworzono skan dla pola {FieldId}", fieldId);
+            return Ok(new { message = "Skan przetworzony i zapisany pomyślnie." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd przetwarzania skanu (GDAL/DB) dla pola {FieldId}", fieldId);
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Pobiera historię wszystkich skanów dostępnych dla danego pola.
+    /// </summary>
+    /// <param name="fieldId">ID pola.</param>
+    /// <returns>Lista metadanych skanów.</returns>
+    [HttpGet("getScansHistory/{fieldId}")]
+    public async Task<IActionResult> GetScansHistory(int fieldId)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        try
+        {
+            var scans = await _fieldService.GetScansHistoryAsync(username, fieldId);
+            return Ok(scans);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd pobierania historii skanów pola {FieldId}", fieldId);
+            return StatusCode(500);
+        }
+    }
+
+    /// <summary>
+    /// Usuwa wybrany skan.
+    /// </summary>
+    /// <param name="scanId">ID skanu do usunięcia.</param>
+    /// <returns>Status operacji.</returns>
+    [HttpDelete("deleteScan/{scanId}")]
+    public async Task<IActionResult> DeleteScan(int scanId)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        try
+        {
+            var deleted = await _fieldService.DeleteScanAsync(username, scanId);
+
+            if (!deleted) return NotFound(new { error = "Skan nie istnieje lub brak uprawnień" });
+
+            _logger.LogInformation("Usunięto skan {ScanId} przez {Username}", scanId, username);
+            return Ok(new { message = "Skan został usunięty" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd usuwania skanu {ScanId}", scanId);
+            return StatusCode(500);
+        }
+    }
+
+    /// <summary>
+    /// Pobiera surowe dane numeryczne NDVI dla najnowszego skanu.
+    /// </summary>
+    /// <param name="fieldId">ID pola.</param>
+    /// <returns>Macierz wartości NDVI lub No Content.</returns>
+    [HttpGet("latestNDVIData/{fieldId}")]
+    public async Task<IActionResult> GetLatestNDVIData(int fieldId)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        try
+        {
+            var result = await _analysisService.GetNdviDataAsync(username, fieldId, null);
+            if (result.Data == null) return NoContent();
+
+            Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
+            return Ok(result.Data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd pobierania danych NDVI dla pola {FieldId}", fieldId);
+            return StatusCode(500);
+        }
+    }
+
+    /// <summary>
+    /// Pobiera surowe dane numeryczne NDVI dla konkretnego skanu.
+    /// </summary>
+    /// <param name="scanId">ID skanu.</param>
+    /// <returns>Macierz wartości NDVI.</returns>
+    [HttpGet("NDVIDataById/{scanId}")]
+    public async Task<IActionResult> GetNDVIDataById(int scanId)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        try
+        {
+            var result = await _analysisService.GetNdviDataAsync(username, 0, scanId);
 
             if (result.Data == null) return NoContent();
 
             Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
             return Ok(result.Data);
         }
-
-        [HttpPost("visualize")]
-        public IActionResult VisualizeNDVI([FromBody] NdviVisualizationDto request)
+        catch (Exception ex)
         {
-            try
-            {
-                if (request.NdviMatrix == null || request.NdviMatrix.Count == 0)
-                    return BadRequest("Brak danych NDVI");
-
-                // Generowanie heatmapy z surowych danych
-                var imageBytes = _analysisService.RenderNdviVisualization(request);
-
-                return File(imageBytes, "image/png");
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { error = ex.Message });
-            }
+            _logger.LogError(ex, "Błąd pobierania danych numerycznych NDVI dla skanu {ScanId}", scanId);
+            return StatusCode(500);
         }
+    }
 
-        [HttpPost("group/{fieldId}")]
-        public async Task<IActionResult> Group(int fieldId, [FromBody] NdviGroupRequest request)
+    /// <summary>
+    /// Renderuje obraz NDVI na podstawie przesłanej macierzy danych (operacja bezstanowa).
+    /// </summary>
+    /// <param name="request">Macierz wartości NDVI i parametry palety kolorów.</param>
+    /// <returns>Wygenerowany obraz PNG.</returns>
+    [HttpPost("visualize")]
+    public IActionResult VisualizeNDVI([FromBody] NdviVisualizationDto request)
+    {
+        try
         {
-            if (request == null || request.CycleId == 0)
-                return BadRequest("Niepoprawne dane wejściowe.");
+            if (request.NdviMatrix == null || request.NdviMatrix.Count == 0)
+                return BadRequest("Brak danych NDVI");
 
-            try
-            {
-                // Cała logika grupowania, nakładania warstw i legendy jest w serwisie
-                var result = await _analysisService.GroupRiskAsync(request);
+            var imageBytes = _analysisService.RenderNdviVisualization(request);
+            return File(imageBytes, "image/png");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd renderowania wizualizacji NDVI");
+            return BadRequest(new { error = ex.Message });
+        }
+    }
 
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { error = ex.Message });
-            }
+    /// <summary>
+    /// Wykonuje grupowanie (klasteryzację) ryzyka na polu.
+    /// </summary>
+    /// <param name="fieldId">ID pola.</param>
+    /// <param name="request">Parametry grupowania.</param>
+    /// <returns>Wynik analizy klastrowania.</returns>
+    [HttpPost("group/{fieldId}")]
+    public async Task<IActionResult> Group(int fieldId, [FromBody] NdviGroupRequestDto request)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        if (request == null || request.CycleId == 0) return BadRequest("Niepoprawne dane wejściowe.");
+
+        try
+        {
+            var result = await _analysisService.GroupRiskAsync(request);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd klastrowania dla pola {FieldId}", fieldId);
+            return BadRequest(new { error = ex.Message });
         }
     }
 }

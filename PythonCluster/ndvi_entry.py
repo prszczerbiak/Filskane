@@ -3,12 +3,14 @@ import json
 import sys
 import os
 
+# 1. Konfiguracja ścieżek (umożliwia importy lokalne przy wywołaniu z C#)
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
 print(f"=== ndvi_entry.py loaded ===")
 
+# 2. Bezpieczny import logiki klastrowania
 try:
     from cluster import detect_red_clusters_from_points
     CLUSTER_AVAILABLE = True
@@ -19,30 +21,33 @@ except ImportError as e:
 
 def ndvi_cluster(input_json: str) -> str:
     """
-    Odbiera JSON z C#, wykonuje DBSCAN, zwraca listę klastrów i mediany NDVI.
+    Interfejs dla C#: Odbiera JSON, wykonuje DBSCAN, zwraca klastry i statystyki.
     """
+    # 3. Zabezpieczenie przed brakiem modułu
     if not CLUSTER_AVAILABLE:
         return json.dumps({
             "cluster_ids": [],
-            "ndvi_medians": {}
+            "ndvi_means": {} 
         })
 
     try:
+        # 4. Deserializacja danych wejściowych
         data = json.loads(input_json)
-        points = np.array(data["points"])  # Nx2
-        ndvi_values = np.array(data["ndvi_values"])  # 🔹 NOWE: wartości NDVI
+        points = np.array(data["points"])
+        ndvi_values = np.array(data["ndvi_values"])
+        
+        # Pobranie parametrów algorytmu (lub wartości domyślnych)
         eps = data.get("eps", 5)
         min_samples = data.get("min_samples", 3)
         ellipse_h = data.get("ellipse_h", 3)
         ellipse_w = data.get("ellipse_w", 4)
 
         print(f"Clustering {len(points)} points with DBSCAN(eps={eps}, min_samples={min_samples})...")
-        print(f"NDVI values range: {ndvi_values.min():.3f} to {ndvi_values.max():.3f}")
         
-        # 🔹 PRZEKAZUJEMY WARTOŚCI NDVI DO KLUSTERYZACJI
-        cluster_ids, ndvi_medians = detect_red_clusters_from_points(
+        # 5. Uruchomienie analizy (detekcja i obliczanie średnich)
+        cluster_ids, ndvi_means = detect_red_clusters_from_points(
             points,
-            ndvi_values,  # 🔹 NOWY ARGUMENT
+            ndvi_values,
             eps=eps,
             min_samples=min_samples,
             ellipse_h=ellipse_h,
@@ -50,18 +55,21 @@ def ndvi_cluster(input_json: str) -> str:
         )
 
         print(f"Clustering completed. Cluster IDs: {set(cluster_ids)}")
-        print(f"NDVI medians: {ndvi_medians}")
+        print(f"NDVI means: {ndvi_means}")
         
+        # 6. Przygotowanie odpowiedzi JSON
+        # Klucz 'ndvi_means' zawiera mapę: ID klastra -> Średnie NDVI
         response = {
             "cluster_ids": cluster_ids,
-            "ndvi_medians": ndvi_medians  # 🔹 NOWE: mediany NDVI
+            "ndvi_means": ndvi_means 
         }
         
         return json.dumps(response)
         
     except Exception as e:
+        # 7. Globalna obsługa błędów (zwracamy pusty wynik zamiast wyjątku)
         print(f"Error in ndvi_cluster: {e}")
         return json.dumps({
             "cluster_ids": [],
-            "ndvi_medians": {}
+            "ndvi_means": {}
         })

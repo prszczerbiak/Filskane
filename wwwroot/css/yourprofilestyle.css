@@ -1,69 +1,160 @@
-﻿body {
-    font-family: Arial, sans-serif;
-    background-color: #f8f8f8;
-    text-align: center;
+﻿/* =========================================
+   1. ZMIENNE (KOLORY I MOTYW)
+   ========================================= */
+:root {
+    --primary-color: green;         
+    --primary-hover: #006400;       
+    --accent-blue: #007bff;         
+    --danger-color: #e74c3c;    
+    --cancel-color: #dae0e5;
+    
+    --bg-body: #f8f8f8;
+    --bg-content: #ffffff;
+    --text-main: #333;
+    --border-color: #ddd;
+    
+    --switch-bg: #f0f0f0;
+    --switch-text: #333;
+    --switch-active-text: #fff;
 }
 
+/* Tryb Ciemny */
+.dark-theme {
+    --bg-body: #202123;      /* Bardzo ciemne tło strony */
+    --bg-content: #2a2b2e;   /* Trochę jaśniejsze tło kart/menu */
+    --text-main: #e5e5e5;
+    --border-color: #444;
+    
+    --switch-bg: #3a3a3d;
+    --switch-text: #ccc;
+    --switch-active-text: #fff;
+}
+
+/* =========================================
+   2. GLOBALNE
+   ========================================= */
 html, body {
     margin: 0;
     padding: 0;
-    height: 100%; /* Upewnij się, że body i html mają wysokość 100% */
+    height: 100%;
+    font-family: Arial, sans-serif;
+    background-color: var(--bg-body);
+    color: var(--text-main);
+    text-align: center;
+    transition: color 0.3s ease;
+    display: flex;
+    flex-direction: column;
 }
 
+/* =========================================
+   3. GŁÓWNY UKŁAD
+   ========================================= */
 .content {
-    border: 5px solid green; /* Zielona ramka */
-    width: calc(100% - 100px); /* Pełna szerokość strony */
-    min-height: calc(100vh - 120px); /* Wypełnia całą wysokość ekranu minus stopka */
-    padding: 20px; /* Odstęp od krawędzi ramki */
-    box-sizing: border-box; /* Zapobiega rozpychaniu ramki przez padding */
-    background-color: white; /* Opcjonalne tło */
-    border-radius: 15px; /* Zaokrąglone rogi ramki */
-    margin: 20px 50px 20px 50px;
-    display: grid; /* ✅ Grid zamiast Flex */
-    grid-template-columns: 1fr 2fr; /* 🧩 1/3 i 2/3 szerokości */
+    border: 5px solid var(--primary-color);
+    width: calc(100% - 100px);
+    min-height: calc(100vh - 120px);
+    padding: 20px;
+    box-sizing: border-box;
+    background-color: var(--bg-content);
+    border-radius: 15px;
+    margin: 20px 50px;
+    
+    display: grid;
+    grid-template-columns: 1fr 2fr;
     gap: 20px;
 }
 
+/* =========================================
+   4. LEWY PANEL - MENU
+   ========================================= */
 .menu {
-    background-color: #ffffff;
-    border-right: 1px solid #ddd;
+    background-color: var(--bg-content);
+    border-right: 1px solid var(--border-color);
     padding: 20px;
-}
-.menu a {
-    display: block;
-    margin-bottom: 15px;
-    text-decoration: none;
-    color: #333;
-    font-weight: bold;
+    display: flex;
+    flex-direction: column;
 }
 
+.menu {
+    background-color: var(--bg-content);
+    border-right: 1px solid var(--border-color);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 1. DOMYŚLNY WYGLĄD (LIGHT MODE) - NIEAKTYWNY */
 .menu-option {
-    border: 5px solid green;
+    border: 5px solid var(--primary-color);
     margin-bottom: 15px;
-    padding: 20px 20px;
+    padding: 20px;
+    /* Domyślne jasne tło w Light Mode */
     background-color: #f8f8f8;
-    color: black;
+    color: var(--text-main);
     border-radius: 25px;
     font-weight: bold;
     text-align: center;
     cursor: pointer;
-    transition: background-color 0.3s, transform 0.2s;
+    transition: transform 0.2s, background-color 0.3s, color 0.3s;
 }
 
-.menu-option:hover {
-    background-color: green;
-    color: white;
-    transform: scale(1.05);
+/* 2. WYGLĄD W DARK MODE - NIEAKTYWNY */
+/* Nadpisujemy tło na przezroczyste, żeby "zlało się" z ciemnym menu */
+.dark-theme .menu-option {
+    background-color: transparent;
+    color: var(--text-main); /* Jasny tekst */
+    border-color: var(--primary-color); /* Zielona ramka zostaje */
 }
 
+/* 3. STAN AKTYWNY I HOVER (WSPÓLNY DLA OBU TRYBÓW) */
+/* Używamy !important, aby ten styl ZAWSZE wygrywał - nieważne czy Dark czy Light */
+.menu-option:hover,
 .menu-option.active {
-    background-color: green; /* wygląd jak po hover */
-    color: white;
+    background-color: var(--primary-color) !important; /* Wymuś zielone tło */
+    color: white !important; /* Wymuś biały tekst */
+    border-color: var(--primary-color) !important;
     transform: scale(1.05);
 }
 
+/* 4. PRZYCISK POWROTU (Specjalny styl) */
+.return-link {
+    margin-top: auto;
+    border-color: #666; /* Szara ramka zamiast zielonej */
+    color: #666;
+}
+
+/* W dark mode return link też przezroczysty, ale z szarym tekstem */
+.dark-theme .return-link {
+    background-color: transparent;
+    color: #aaa;
+    border-color: #666;
+}
+
+/* Return link po najechaniu - ciemnoszary (nie zielony) */
+.return-link:hover {
+    background-color: #666 !important;
+    color: white !important;
+    border-color: #666 !important;
+}
+/* =========================================
+   5. PRAWY PANEL
+   ========================================= */
 .description {
     padding: 20px;
+}
+
+.tab-content {
+    display: none;
+    animation: fadeIn 0.4s ease;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .description form {
@@ -76,128 +167,116 @@ html, body {
     display: block;
     margin-bottom: 5px;
     font-weight: bold;
-    text-align: left; /* Dodatkowo: wyrównanie etykiet */
+    text-align: left;
+    color: var(--text-main);
+}
+
+.input-with-icon {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 15px;
 }
 
 .description input {
     width: 100%;
     padding: 8px;
     margin-top: 5px;
-    margin-bottom: 15px;
     box-sizing: border-box;
-    border: 2px solid #ccc;
+    border: 2px solid var(--border-color);
     border-radius: 7px;
-}
-
-.input-with-icon {
-    display: flex;
-    align-items: center; /* Wyśrodkowanie w pionie */
-    gap: 8px; /* odstęp między polem a ikoną */
-}
-
-.input-with-icon input {
-    flex: 1;
-    padding-right: 10px; /* opcjonalnie, więcej miejsca z prawej */
-    height: 36px; /* dopasuj do ikonki, jeśli trzeba */
-    font-size: 16px;
-    line-height: 1.2;
+    background-color: var(--bg-body);
+    color: var(--text-main);
 }
 
 .edit-icon {
     cursor: pointer;
     font-size: 18px;
-    color: #007BFF;
-    user-select: none;
+    color: var(--accent-blue);
     display: flex;
-    align-items: center; /* wyśrodkowanie w pionie */
+    align-items: center;
     height: 100%;
+    padding: 5px;
 }
 
-footer {
-    background-color: green; /* Zielone tło */
-    color: white; /* Biały tekst */
-    text-align: center; /* Wyśrodkowanie tekstu */
-    padding: 15px; /* Wewnętrzny odstęp */
-    bottom: 0;
-    left: 0; /* Przypięcie do lewej strony */
-    width: 100%; /* Pełna szerokość ekranu */
-    box-sizing: border-box; /* Zapobiega przesunięciom przez padding */
-}
-.unit-switch {
+/* =========================================
+   6. SWITCHES
+   ========================================= */
+.unit-switch, .theme-switch {
     display: flex;
     position: relative;
-    background: #f0f0f0;
+    background: var(--switch-bg);
     border-radius: 20px;
     overflow: hidden;
-    width: 200px;
     cursor: pointer;
     justify-content: center;
     margin: 20px auto;
 }
 
-.switch-option {
+.unit-switch { width: 200px; }
+.theme-switch { width: 120px; font-size: 1.3em; margin-top: 10px; }
+
+.switch-option, .theme-option {
     flex: 1;
     text-align: center;
     padding: 8px 0;
     z-index: 2;
     transition: color 0.2s ease;
+    color: var(--switch-text);
 }
 
-    .switch-option.active {
-        color: #fff;
-    }
+.switch-option.active, .theme-option.active {
+    color: var(--switch-active-text);
+}
 
-.switch-highlight {
+.switch-highlight, .theme-highlight {
     position: absolute;
     top: 0;
     bottom: 0;
     left: 0;
-    width: calc(100% / 3);
-    background: #007bff;
+    background: var(--accent-blue);
     border-radius: 20px;
     transition: left 0.3s ease;
     z-index: 1;
 }
 
-.theme-switch {
-    display: flex;
-    position: relative;
-    background: #f0f0f0;
-    border-radius: 20px;
-    overflow: hidden;
-    width: 120px;
+.switch-highlight { width: 33.33%; }
+.theme-highlight { width: 50%; }
+
+.dark-theme .switch-highlight, 
+.dark-theme .theme-highlight {
+    background-color: #505050;
+}
+
+/* =========================================
+   7. STREFA NIEBEZPIECZNA
+   ========================================= */
+.danger-zone {
+    margin-top: 30px;
+    padding: 20px;
+    border: 2px solid var(--danger-color);
+    border-radius: 10px;
+    background-color: rgba(231, 76, 60, 0.1);
+    color: var(--danger-color);
+}
+
+.btn-delete-account {
+    background-color: var(--danger-color);
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
     cursor: pointer;
-    justify-content: center;
-    margin: 10px auto;
-    font-size: 1.3em;
+    font-weight: bold;
+    margin-top: 10px;
 }
 
-.theme-option {
-    flex: 1;
-    text-align: center;
-    padding: 8px 0;
-    z-index: 2;
-    transition: color 0.2s ease;
-}
 
-    .theme-option.active {
-        color: #fff;
-    }
-
-.theme-highlight {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    width: 50%;
-    background: #007bff;
-    border-radius: 20px;
-    transition: left 0.3s ease;
-    z-index: 1;
-}
-
+/* =========================================
+   8. MODALE
+   ========================================= */
 .modal {
-    display: none; /* domyślnie ukryty */
+    display: none;
     position: fixed;
     z-index: 1000;
     left: 0;
@@ -209,7 +288,8 @@ footer {
 }
 
 .modal-content {
-    background-color: #fff;
+    background-color: var(--bg-content);
+    color: var(--text-main);
     margin: 10% auto;
     padding: 20px;
     border-radius: 10px;
@@ -218,110 +298,43 @@ footer {
     animation: fadeIn 0.3s ease-in-out;
 }
 
-.btn-close {
-    background-color: #e74c3c; /* czerwony */
-    color: white;
-}
-
-.btn-save {
-    background: #28a745;
-    color: #fff;
-}
-
-.dark-theme body {
-    background-color: #202123; /* szare tło całej strony */
-    color: #e5e5e5; /* jasny tekst */
-}
-
-.dark-theme .content {
-    background-color: #2a2b2e; /* ciemniejsze tło kontenera (GPT-style) */
-    color: #e5e5e5; /* jasny tekst wewnątrz contentu */
-}
-
-.dark-theme .menu {
-    background-color: #2a2b2e; /* tło menu bocznego */
-    border-right: 1px solid #444; /* ciemniejsza linia separatora */
-}
-
-    .dark-theme .menu-option {
-        background-color: #2a2b2e;
-        color: #e5e5e5;  jasny tekst w menu 
-    }
-
-        .dark-theme .menu-option:hover {
-            background-color: green;
-            color: white;
-            transform: scale(1.05);
-        }
-
-        .dark-theme .menu-option.active {
-            background-color: green; /* wygląd jak po hover */
-            color: white;
-            transform: scale(1.05);
-        }
-
-.dark-theme .description {
-    color: #e5e5e5; /* tekst w opisach/formularzach */
-}
-
-.dark-theme input {
-    background-color: #3a3b3f; /* ciemne pole tekstowe */
-    color: #ffffff;
-    border: 2px solid #555;
-}
-
-/* DARK MODE SWITCHES */
-.dark-theme .unit-switch,
-.dark-theme .theme-switch {
-    background-color: #3a3a3d; /* ciemne tło całego switcha */
-}
-
-.dark-theme .switch-option,
-.dark-theme .theme-option {
-    background-color: transparent; /* przezroczyste, żeby było widać highlight */
-    color: #ccc; /* tekst nieaktywny */
-    z-index: 2;
-}
-
-    .dark-theme .switch-option.active,
-    .dark-theme .theme-option.active {
-        color: #ffffff; /* aktywny tekst na highlight */
-    }
-
-.dark-theme .switch-highlight,
-.dark-theme .theme-highlight {
-    background-color: #505050; /* jasny szary highlight */
-    z-index: 1;
-    border-radius: 20px;
-}
-
 .modal-footer {
     text-align: center;
-    margin: 20px 0;
+    margin: 20px 0 0 0;
 }
 
-    .modal-footer button {
-        padding: 8px 15px;
-        margin-left: 10px;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-    }
-
-form label {
-    display: block;
-    margin: 10px 0 5px;
-}
-
-form input {
-    width: 100%;
-    padding: 8px;
-    margin-bottom: 15px;
-    border: 1px solid #ddd;
+.modal-footer button {
+    padding: 8px 15px;
+    margin-left: 10px;
+    border: none;
     border-radius: 5px;
-    box-sizing: border-box;
+    cursor: pointer;
+    font-weight: bold;
 }
 
-.dark-theme .modal-content {
-    background-color: #202123;
+.modal-input {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 25px; /* Odstęp od przycisków */
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--bg-body);
+    color: var(--text-main);
+    font-size: 1rem;
+    box-sizing: border-box;
+    transition: border-color 0.3s;
+}
+
+.btn-close { background-color: var(--cancel-color); color: black; }
+.btn-save { background-color: var(--primary-color); color: white; }
+.btn-delete-confirm { background-color: var(--danger-color); color: white; }
+
+/* =========================================
+   9. STOPKA
+   ========================================= */
+footer {
+    background-color: var(--primary-color);
+    color: white;
+    text-align: center;
+    padding: 15px;
 }

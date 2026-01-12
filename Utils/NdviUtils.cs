@@ -1,46 +1,71 @@
-﻿using BitMiracle.LibTiff.Classic;
+﻿using OSGeo.GDAL;
+using System;
 
 namespace WebApplication1.Utils;
-
+/// <summary>
+/// Klasa pomocnicza dotycząca NDVI
+/// </summary>
 public static class NdviUtils
 {
-    // Zwraca macierz wartości NDVI od -1.0 do 1.0
+    #region Public Methods
+    /// <summary>
+    /// Funkcja przeliczająca NDVI
+    /// </summary>
+    /// <param name="tiffBytes">Tablica bajtowa zawierająca potrzebne m.in. pasma</param>
+    /// <returns>Macierz liczb typu zmiennoprzecinkowego podwójnej precyzji, zawierająca NDVI wejściowego obrazu</returns>
+    /// <exception cref="Exception"></exception>
     public static double[,] CalculateNdvi(byte[] tiffBytes)
     {
-        using var ms = new MemoryStream(tiffBytes);
-        using var tiff = Tiff.ClientOpen("in-mem", "r", ms, new TiffStream());
+        Gdal.AllRegister();
 
-        if (tiff == null) throw new Exception("Nie można odczytać danych TIFF.");
+        string memPath = $"/vsimem/ndvi_calc_{Guid.NewGuid()}.tif";
 
-        int width = tiff.GetField(TiffTag.IMAGEWIDTH)[0].ToInt();
-        int height = tiff.GetField(TiffTag.IMAGELENGTH)[0].ToInt();
-        int samplesPerPixel = tiff.GetField(TiffTag.SAMPLESPERPIXEL)[0].ToInt(); // Oczekujemy 4 (B02, B03, B04, B08)
-
-        int scanlineSize = tiff.ScanlineSize();
-        byte[] scanline = new byte[scanlineSize];
-
-        double[,] ndvi = new double[height, width];
-
-        for (int y = 0; y < height; y++)
+        try
         {
-            tiff.ReadScanline(scanline, y);
-            for (int x = 0; x < width; x++)
+            Gdal.FileFromMemBuffer(memPath, tiffBytes);
+
+            using var ds = Gdal.Open(memPath, Access.GA_ReadOnly);
+            if (ds == null) throw new Exception("Nie można otworzyć obrazu przez GDAL.");
+
+            int width = ds.RasterXSize;
+            int height = ds.RasterYSize;
+
+            using var bandRed = ds.GetRasterBand(3);
+            using var bandNir = ds.GetRasterBand(4);
+
+            int[] redBuffer = new int[width * height];
+            int[] nirBuffer = new int[width * height];
+
+            bandRed.ReadRaster(0, 0, width, height, redBuffer, width, height, 0, 0);
+            bandNir.ReadRaster(0, 0, width, height, nirBuffer, width, height, 0, 0);
+
+            double[,] ndvi = new double[height, width];
+
+            for (int i = 0; i < width * height; i++)
             {
-                int offset = x * samplesPerPixel * 2; // 16-bit = 2 bajty
+                int y = i / width;
+                int x = i % width;
 
-                // Zakładamy kolejność kanałów z GDAL Merge: B02, B03, B04 (Red), B08 (NIR)
-                // Offset 0: Blue, 2: Green, 4: Red, 6: NIR
-                ushort redRaw = BitConverter.ToUInt16(scanline, offset + 4);
-                ushort nirRaw = BitConverter.ToUInt16(scanline, offset + 6);
+                double red = redBuffer[i];
+                double nir = nirBuffer[i];
 
-                float red = redRaw / 16383f; // Normalizacja do 0..1 (dla Sentinel-2 często dzieli się przez 10000, ale 16383 to max 14-bit)
-                float nir = nirRaw / 16383f;
-
-                double val = (nir + red == 0) ? 0 : (nir - red) / (nir + red);
-                ndvi[y, x] = Math.Clamp(val, -1.0, 1.0);
+                if (nir + red == 0)
+                {
+                    ndvi[y, x] = 0;
+                }
+                else
+                {
+                    double val = (nir - red) / (nir + red);
+                    ndvi[y, x] = Math.Clamp(val, -1.0, 1.0);
+                }
             }
-        }
 
-        return ndvi;
+            return ndvi;
+        }
+        finally
+        {
+            Gdal.Unlink(memPath);
+        }
     }
+    #endregion
 }
