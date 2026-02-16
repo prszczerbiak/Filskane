@@ -86,6 +86,8 @@ namespace Filskane.Services
         {
             var (complex, type, substrate) = await FetchSoilDetails(dto.CenterX, dto.CenterY);
 
+            Console.WriteLine($"Pobieranie danych glebowych dla pola '{dto.Name}': Kompleks={complex}, Typ={type}, Podłoże={substrate}");
+
             return await _fieldDal.SaveFieldAsync(
                 username,
                 dto.Name,
@@ -144,12 +146,16 @@ namespace Filskane.Services
                 XNamespace esri = "http://www.esri.com/wms";
                 var fields = doc.Descendants(esri + "FIELDS").FirstOrDefault();
 
-                if (fields == null) return ("Nieznany", "Nieznany", "Nieznany");
+                if (fields == null) return (null, null, null);
+
+                string? complex = (string?)fields.Attribute("KOMPLEKS");
+                string? type = (string?)fields.Attribute("TYPPODTYP");
+                string? substrate = (string?)fields.Attribute("PODLOZE1");
 
                 return (
-                    (string?)fields.Attribute("KOMPLEKS") ?? "",
-                    (string?)fields.Attribute("TYPPODTYP") ?? "",
-                    (string?)fields.Attribute("PODLOZE1") ?? ""
+                    complex?.Equals("Null", StringComparison.OrdinalIgnoreCase) == true ? null : complex,
+                    type?.Equals("Null", StringComparison.OrdinalIgnoreCase) == true ? null : type,
+                    substrate?.Equals("Null", StringComparison.OrdinalIgnoreCase) == true ? null : substrate
                 );
             }
             catch
