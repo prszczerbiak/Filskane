@@ -326,25 +326,44 @@ public class FieldDAL : BaseDAL
     /// Pobiera progi NDVI dla poszczególnych cykli wzrostu.
     /// </summary>
     /// <returns>Lista progów NDVI dla cykli.</returns>
-    public async Task<List<ThresholdDto>> GetThresholdsAsync()
+    // <summary>
+    /// Pobiera progi wartości indeksów (np. NDVI) dla konkretnej rośliny i wszystkich jej cykli.
+    /// </summary>
+    /// <param name="plantId">ID rośliny uprawnej.</param>
+    /// <param name="indexType">Typ wskaźnika (domyślnie 'NDVI').</param>
+    /// <returns>Lista progów dla cykli danej rośliny.</returns>
+    public async Task<ThresholdDto?> GetThresholdAsync(int plantId, int cycleId, string indexType = "NDVI")
     {
-        var list = new List<ThresholdDto>();
         await using var conn = CreateConnection();
         await conn.OpenAsync();
 
-        const string sql = "SELECT CYCLE_ID, MIN_NDVI, MAX_NDVI FROM GROWTH_CYCLES";
+        // Dodano CYCLE_ID do warunków WHERE, nie pobieramy nazwy cyklu bo to zbędne do obliczeń
+        const string sql = @"
+        SELECT MIN_VALUE, MAX_VALUE 
+        FROM PLANT_THRESHOLDS 
+        WHERE PLANT_ID = :plantId 
+          AND CYCLE_ID = :cycleId 
+          AND INDEX_TYPE = :indexType";
 
         await using var cmd = new OracleCommand(sql, conn);
+        cmd.Parameters.Add("plantId", OracleDbType.Int32).Value = plantId;
+        cmd.Parameters.Add("cycleId", OracleDbType.Int32).Value = cycleId;
+        cmd.Parameters.Add("indexType", OracleDbType.Varchar2).Value = indexType.ToUpper();
+
         await using var reader = await cmd.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
+
+        // Używamy if zamiast while, bo kombinacja kluczy gwarantuje maksymalnie 1 wynik
+        if (await reader.ReadAsync())
         {
-            list.Add(new ThresholdDto(
-                Convert.ToInt32(reader["CYCLE_ID"]),
-                Convert.ToDouble(reader["MIN_NDVI"]),
-                Convert.ToDouble(reader["MAX_NDVI"])
-            ));
+            return new ThresholdDto(
+                cycleId, // Przekazujemy z powrotem ID cyklu z parametru dla spójności struktury DTO
+                Convert.ToDouble(reader["MIN_VALUE"]),
+                Convert.ToDouble(reader["MAX_VALUE"])
+            );
         }
-        return list;
+
+        // Zwracamy null, jeśli w bazie nie ma klamer dla tej dziwnej kombinacji
+        return null;
     }
 
     /// <summary>

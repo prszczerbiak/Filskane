@@ -17,6 +17,8 @@ namespace Filskane.DAL
             // Jeśli go brakuje, rzucany jest krytyczny błąd, bo aplikacja nie może działać bez bazy.
             _connectionString = configuration.GetConnectionString("OracleDb")
                                 ?? throw new InvalidOperationException("Nie znaleziono klucza 'OracleDb' w sekcji ConnectionStrings w appsettings.json.");
+
+            Console.WriteLine(_connectionString);
         }
 
         /// <summary>

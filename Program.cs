@@ -1,11 +1,42 @@
+using Filskane.DAL;
+using Filskane.Services;
+using MaxRev.Gdal.Core;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using OSGeo.GDAL;
+using System.Runtime.InteropServices;
 using System.Text;
-using Filskane.DAL;
-using Filskane.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var nativePath = Path.Combine(AppContext.BaseDirectory, "runtimes", "win-x64", "native");
+nativePath = Path.GetFullPath(nativePath);
+Console.WriteLine("Native path: " + nativePath);
+Console.WriteLine("Istnieje: " + Directory.Exists(nativePath));
+Environment.SetEnvironmentVariable("PATH", nativePath + ";" + Environment.GetEnvironmentVariable("PATH"));
+
+Console.WriteLine("BaseDirectory: " + AppContext.BaseDirectory);
+Console.WriteLine("CurrentDirectory: " + Directory.GetCurrentDirectory());
+
+var dlls = Directory.GetFiles(AppContext.BaseDirectory, "gdal_wrap.dll", SearchOption.AllDirectories);
+Console.WriteLine("gdal_wrap.dll znaleziony w: " + (dlls.Length > 0 ? dlls[0] : "BRAK!"));
+
+NativeLibrary.SetDllImportResolver(
+    typeof(OSGeo.GDAL.Gdal).Assembly,
+    (libraryName, assembly, searchPath) =>
+    {
+        var nativePath = Path.Combine(AppContext.BaseDirectory, "runtimes", "win-x64", "native");
+        var fullPath = Path.Combine(nativePath, libraryName + ".dll");
+        Console.WriteLine($"Szukam: {fullPath}, istnieje: {File.Exists(fullPath)}");
+        if (File.Exists(fullPath))
+            return NativeLibrary.Load(fullPath);
+        return IntPtr.Zero;
+    }
+);
+
+GdalBase.ConfigureAll();
+Gdal.AllRegister();
 
 // Podstawowe us³ugi frameworka ASP.NET Core
 builder.Services.AddControllers();

@@ -35,7 +35,19 @@
                     <button id="importBtn" class="btn-primary"><i class="fa-solid fa-cloud-arrow-up"></i> Importuj Skan</button>
                     <input type="file" id="tiffInput" accept=".zip,application/zip" style="display:none">
 
-                    <button id="ndviBtn" class="btn-success"><i class="fa-solid fa-leaf"></i> Analiza NDVI</button>
+                    <div class="dropdown" style="position: relative; display: inline-block;">
+                        <button id="analysisBtn" class="btn-success">
+                            <i class="fa-solid fa-leaf"></i> Analiza <i class="fa-solid fa-caret-down"></i>
+                        </button>
+                        <div id="analysisDropdown" class="dropdown-content" style="display: none; position: absolute; z-index: 10; background: white; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-radius: 4px; padding: 5px; min-width: 150px; flex-direction: column; gap: 5px;">
+                            <button class="btn-action" data-analysis="NDVI">NDVI</button>
+                            <button class="btn-action" data-analysis="GNDVI">GNDVI</button>
+                            <button class="btn-action" data-analysis="SAVI">SAVI</button>
+                            <button class="btn-action" data-analysis="NDWI">NDWI</button>
+                            <button class="btn-action" data-analysis="EVI">EVI</button>
+                        </div>
+                    </div>
+
                     <button id="historyBtn" class="btn-info"><i class="fa-solid fa-clock-rotate-left"></i> Historia</button>
                 </div>
 

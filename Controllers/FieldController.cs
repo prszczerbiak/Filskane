@@ -298,20 +298,188 @@ public class FieldController : ControllerBase
         }
     }
 
+    [HttpGet("latestGNDVIData/{fieldId}")]
+    public async Task<IActionResult> GetLatestGNDVIData(int fieldId)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        try
+        {
+            var result = await _analysisService.GetGndviDataAsync(username, fieldId, null);
+            if (result.Data == null) return NoContent();
+
+            Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
+            return Ok(result.Data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd pobierania danych GNDVI dla pola {FieldId}", fieldId);
+            return StatusCode(500);
+        }
+    }
+
+    [HttpGet("GNDVIDataById/{scanId}")]
+    public async Task<IActionResult> GetGNDVIDataById(int scanId)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        try
+        {
+            var result = await _analysisService.GetGndviDataAsync(username, 0, scanId);
+            if (result.Data == null) return NoContent();
+
+            Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
+            return Ok(result.Data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd pobierania danych numerycznych GNDVI dla skanu {ScanId}", scanId);
+            return StatusCode(500);
+        }
+    }
+
+    [HttpGet("latestSAVIData/{fieldId}")]
+    public async Task<IActionResult> GetLatestSAVIData(int fieldId)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        try
+        {
+            var result = await _analysisService.GetSaviDataAsync(username, fieldId, null);
+            if (result.Data == null) return NoContent();
+
+            Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
+            return Ok(result.Data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd pobierania danych SAVI dla pola {FieldId}", fieldId);
+            return StatusCode(500);
+        }
+    }
+
+    [HttpGet("SAVIDataById/{scanId}")]
+    public async Task<IActionResult> GetSAVIDataById(int scanId)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        try
+        {
+            var result = await _analysisService.GetSaviDataAsync(username, 0, scanId);
+            if (result.Data == null) return NoContent();
+
+            Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
+            return Ok(result.Data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd pobierania danych numerycznych SAVI dla skanu {ScanId}", scanId);
+            return StatusCode(500);
+        }
+    }
+
+    [HttpGet("latestNDWIData/{fieldId}")]
+    public async Task<IActionResult> GetLatestNDWIData(int fieldId)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        try
+        {
+            var result = await _analysisService.GetNdwiDataAsync(username, fieldId, null);
+            if (result.Data == null) return NoContent();
+
+            Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
+            return Ok(result.Data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd pobierania danych NDWI dla pola {FieldId}", fieldId);
+            return StatusCode(500);
+        }
+    }
+
+    [HttpGet("NDWIDataById/{scanId}")]
+    public async Task<IActionResult> GetNDWIDataById(int scanId)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        try
+        {
+            var result = await _analysisService.GetNdwiDataAsync(username, 0, scanId);
+            if (result.Data == null) return NoContent();
+
+            Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
+            return Ok(result.Data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd pobierania danych numerycznych NDWI dla skanu {ScanId}", scanId);
+            return StatusCode(500);
+        }
+    }
+
+    [HttpGet("latestEVIData/{fieldId}")]
+    public async Task<IActionResult> GetLatestEVIData(int fieldId)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        try
+        {
+            var result = await _analysisService.GetEviDataAsync(username, fieldId, null);
+            if (result.Data == null) return NoContent();
+
+            Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
+            return Ok(result.Data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd pobierania danych EVI dla pola {FieldId}", fieldId);
+            return StatusCode(500);
+        }
+    }
+
+    [HttpGet("EVIDataById/{scanId}")]
+    public async Task<IActionResult> GetEVIDataById(int scanId)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        try
+        {
+            var result = await _analysisService.GetEviDataAsync(username, 0, scanId);
+            if (result.Data == null) return NoContent();
+
+            Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
+            return Ok(result.Data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd pobierania danych numerycznych EVI dla skanu {ScanId}", scanId);
+            return StatusCode(500);
+        }
+    }
+
     /// <summary>
     /// Renderuje obraz NDVI na podstawie przesłanej macierzy danych (operacja bezstanowa).
     /// </summary>
     /// <param name="request">Macierz wartości NDVI i parametry palety kolorów.</param>
     /// <returns>Wygenerowany obraz PNG.</returns>
     [HttpPost("visualize")]
-    public IActionResult VisualizeNDVI([FromBody] NdviVisualizationDto request)
+    public IActionResult VisualizeNDVI([FromBody] IndexVisualizationDto request)
     {
         try
         {
-            if (request.NdviMatrix == null || request.NdviMatrix.Count == 0)
+            if (request.IndexMatrix == null || request.IndexMatrix.Count == 0)
                 return BadRequest("Brak danych NDVI");
 
-            var imageBytes = _analysisService.RenderNdviVisualization(request);
+            var imageBytes = _analysisService.RenderIndexVisualization(request);
             return File(imageBytes, "image/png");
         }
         catch (Exception ex)
@@ -333,7 +501,8 @@ public class FieldController : ControllerBase
         var username = GetCurrentUsername();
         if (string.IsNullOrEmpty(username)) return Unauthorized();
 
-        if (request == null || request.CycleId == 0) return BadRequest("Niepoprawne dane wejściowe.");
+        if (request == null || request.CycleId == 0 || request.PlantId == 0)
+            return BadRequest("Niepoprawne dane wejściowe.");
 
         try
         {

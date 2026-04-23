@@ -4,7 +4,8 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Drawing.Processing;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
-using Filskane.Models; 
+using Filskane.Models;
+using MaxRev.Gdal.Core;
 
 namespace Filskane.Utils;
 
@@ -22,8 +23,6 @@ public static class ImageUtils
     /// <exception cref="Exception"></exception>
     public static byte[] ConvertTiffToPng(byte[] tiffBytes)
     {
-        Gdal.PushErrorHandler("CPLQuietErrorHandler");
-        Gdal.AllRegister();
         string memPath = $"/vsimem/img_convert_{Guid.NewGuid()}.tif";
 
         try

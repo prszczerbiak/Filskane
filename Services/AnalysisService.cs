@@ -62,6 +62,53 @@ public class AnalysisService
     /// <param name="scanId">ID skanu (opcjonalne).</param>
     /// <returns>Obiekt z macierzą NDVI i datą skanu.</returns>
     public async Task<(NdviDataDto? Data, DateTime? Date)> GetNdviDataAsync(string username, int fieldId, int? scanId)
+        => await GetVegetationDataAsync(username, fieldId, scanId, NdviUtils.CalculateNdvi);
+
+    /// <summary>
+    /// Pobiera surowe dane numeryczne GNDVI dla skanu.
+    /// </summary>
+    /// <param name="username">Nazwa użytkownika.</param>
+    /// <param name="fieldId">ID pola.</param>
+    /// <param name="scanId">ID skanu (opcjonalne).</param>
+    /// <returns>Obiekt z macierzą GNDVI i datą skanu.</returns>
+    public async Task<(NdviDataDto? Data, DateTime? Date)> GetGndviDataAsync(string username, int fieldId, int? scanId)
+        => await GetVegetationDataAsync(username, fieldId, scanId, NdviUtils.CalculateGndvi);
+
+    /// <summary>
+    /// Pobiera surowe dane numeryczne SAVI dla skanu.
+    /// </summary>
+    /// <param name="username">Nazwa użytkownika.</param>
+    /// <param name="fieldId">ID pola.</param>
+    /// <param name="scanId">ID skanu (opcjonalne).</param>
+    /// <returns>Obiekt z macierzą SAVI i datą skanu.</returns>
+    public async Task<(NdviDataDto? Data, DateTime? Date)> GetSaviDataAsync(string username, int fieldId, int? scanId)
+        => await GetVegetationDataAsync(username, fieldId, scanId, NdviUtils.CalculateSavi);
+
+    /// <summary>
+    /// Pobiera surowe dane numeryczne NDWI dla skanu.
+    /// </summary>
+    /// <param name="username">Nazwa użytkownika.</param>
+    /// <param name="fieldId">ID pola.</param>
+    /// <param name="scanId">ID skanu (opcjonalne).</param>
+    /// <returns>Obiekt z macierzą NDWI i datą skanu.</returns>
+    public async Task<(NdviDataDto? Data, DateTime? Date)> GetNdwiDataAsync(string username, int fieldId, int? scanId)
+        => await GetVegetationDataAsync(username, fieldId, scanId, NdviUtils.CalculateNdwi);
+
+    /// <summary>
+    /// Pobiera surowe dane numeryczne EVI dla skanu.
+    /// </summary>
+    /// <param name="username">Nazwa użytkownika.</param>
+    /// <param name="fieldId">ID pola.</param>
+    /// <param name="scanId">ID skanu (opcjonalne).</param>
+    /// <returns>Obiekt z macierzą EVI i datą skanu.</returns>
+    public async Task<(NdviDataDto? Data, DateTime? Date)> GetEviDataAsync(string username, int fieldId, int? scanId)
+        => await GetVegetationDataAsync(username, fieldId, scanId, NdviUtils.CalculateEvi);
+
+    private async Task<(NdviDataDto? Data, DateTime? Date)> GetVegetationDataAsync(
+        string username,
+        int fieldId,
+        int? scanId,
+        Func<byte[], double[,]> calculator)
     {
         ScanResultDto? scan = scanId.HasValue
             ? await _scanDal.GetScanByIdAsync(username, scanId.Value)
@@ -69,10 +116,10 @@ public class AnalysisService
 
         if (scan == null || scan.ImageBytes == null) return (null, null);
 
-        double[,] ndviMatrix = NdviUtils.CalculateNdvi(scan.ImageBytes);
-        var ndviList = ImageUtils.ConvertToNestedList(ndviMatrix);
+        double[,] vegetationMatrix = calculator(scan.ImageBytes);
+        var vegetationList = ImageUtils.ConvertToNestedList(vegetationMatrix);
 
-        return (new NdviDataDto(ndviList, scan.FieldBbox), scan.ScanDate);
+        return (new NdviDataDto(vegetationList, scan.FieldBbox), scan.ScanDate);
     }
 
     /// <summary>
@@ -81,16 +128,19 @@ public class AnalysisService
     /// </summary>
     /// <param name="dto">Dane wejściowe (macierz NDVI, bbox).</param>
     /// <returns>Obraz PNG z wizualizacją NDVI.</returns>
-    public byte[] RenderNdviVisualization(NdviVisualizationDto dto)
+    public byte[] RenderIndexVisualization(IndexVisualizationDto dto)
     {
-        var ndviArray = ImageUtils.ConvertFromNestedList(dto.NdviMatrix);
-        var ndviMap = PlotUtils.RenderNdviHeatmap(ndviArray);
+        var indexArray = ImageUtils.ConvertFromNestedList(dto.IndexMatrix);
+        var analysisType = dto.AnalysisType?.Trim().ToUpperInvariant();
+        var indexMap = analysisType == "NDWI"
+            ? PlotUtils.RenderNDWIHeatmap(indexArray)
+            : PlotUtils.RenderVegetationHeatmap(indexArray);
 
         if ((!string.IsNullOrEmpty(dto.FieldBbox)) && dto.Bbox != null)
         {
-            ndviMap = ImageUtils.DrawGeoJsonPolygonOnImage(ndviMap, dto.FieldBbox, dto.Bbox, true);
+            indexMap = ImageUtils.DrawGeoJsonPolygonOnImage(indexMap, dto.FieldBbox, dto.Bbox, true);
         }
-        return ndviMap;
+        return indexMap;
     }
 
     /// <summary>
@@ -101,13 +151,16 @@ public class AnalysisService
     /// <returns>Obiekt zawierający obrazy mapy i legendy zakodowane w Base64.</returns>
     public async Task<GroupingResultDto> GroupRiskAsync(NdviGroupRequestDto request)
     {
-        var thresholds = await _fieldDal.GetThresholdsAsync();
+        var analysisType = string.IsNullOrWhiteSpace(request.AnalysisType)
+            ? "NDVI"
+            : request.AnalysisType.Trim().ToUpperInvariant();
 
-        var cycleThreshold = thresholds.FirstOrDefault(t => t.CycleId == request.CycleId);
-        double minT = cycleThreshold?.MinNdvi ?? 0.2;
-        double maxT = cycleThreshold?.MaxNdvi ?? 0.6;
+        var threshold = await _fieldDal.GetThresholdAsync(request.PlantId, request.CycleId, analysisType);
+        double minT = threshold?.MinNdvi ?? 0.2;
+        double maxT = threshold?.MaxNdvi ?? 0.6;
+        Console.WriteLine($"Using thresholds for {analysisType} - Min: {minT}, Max: {maxT}");
 
-        double[,] ndviMatrix = ImageUtils.ConvertFromNestedList(request.Ndvi);
+        double[,] ndviMatrix = ImageUtils.ConvertFromNestedList(request.VegetationIndex);
         int width = ndviMatrix.GetLength(1);
         int height = ndviMatrix.GetLength(0);
 
@@ -135,7 +188,9 @@ public class AnalysisService
         }
 
         var overlayBytes = ImageUtils.CreateRiskOverlayFromPoints(fieldPixels, finalLabels, width, height, ndviMedians, minT);
-        var baseMap = PlotUtils.RenderNdviHeatmap(ndviMatrix);
+        var baseMap = analysisType == "NDWI"
+            ? PlotUtils.RenderNDWIHeatmap(ndviMatrix)
+            : PlotUtils.RenderVegetationHeatmap(ndviMatrix);
         var combinedMap = ImageUtils.CombineImages(baseMap, overlayBytes);
         var finalImage = ImageUtils.DrawGeoJsonPolygonOnImage(combinedMap, request.FieldGeojson, request.ImageBbox, true);
         var legendBytes = ImageUtils.CreateLegendWithClusters(ndviMedians, clusterIds, minT, request.DarkMode);
@@ -157,7 +212,10 @@ public class AnalysisService
     public async Task ProcessAndSaveScanAsync(string username, int fieldId, UpdateTiffsDto data)
     {
         Gdal.AllRegister();
-        string[] expectedBands = { "B02", "B03", "B04", "B08" };
+
+        // ZMIANA 1: Nowa, pełna lista pasm dla rolnictwa (10 kanałów)
+        string[] expectedBands = { "B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B11", "B12" };
+
         var bandDatasets = new Dictionary<string, Dataset>();
         string outPath = $"/vsimem/merged_{fieldId}_{Guid.NewGuid()}.tif";
 
@@ -174,7 +232,9 @@ public class AnalysisService
                     !entry.FullName.EndsWith(".tiff", StringComparison.OrdinalIgnoreCase)) continue;
 
                 string nameUpper = Path.GetFileNameWithoutExtension(entry.Name).ToUpper();
-                var bandName = expectedBands.FirstOrDefault(b => nameUpper.Contains(b));
+
+                // Szukamy dopasowania, ale ostrożnie (np. żeby "B08" nie złapało "B8A")
+                var bandName = expectedBands.FirstOrDefault(b => nameUpper.Contains(b + "_") || nameUpper.EndsWith(b));
                 if (bandName == null) continue;
 
                 using var bandStream = entry.Open();
@@ -192,19 +252,30 @@ public class AnalysisService
             var missing = expectedBands.Where(b => !bandDatasets.ContainsKey(b)).ToList();
             if (missing.Any()) throw new Exception($"Brakuje pasm: {string.Join(", ", missing)}");
 
+            // B02 będzie naszym wzorcem dla najwyższej rozdzielczości (10m)
             var b02 = bandDatasets["B02"];
-            int xSize = b02.RasterXSize;
-            int ySize = b02.RasterYSize;
+            int targetXSize = b02.RasterXSize;
+            int targetYSize = b02.RasterYSize;
             var driver = Gdal.GetDriverByName("GTiff");
 
-            using var outDs = driver.Create(outPath, xSize, ySize, 4, DataType.GDT_Int16, ["INTERLEAVE=PIXEL"]);
+            // ZMIANA 2: Dynamiczna ilość kanałów na podstawie expectedBands.Length
+            using var outDs = driver.Create(outPath, targetXSize, targetYSize, expectedBands.Length, DataType.GDT_Int16, ["INTERLEAVE=PIXEL"]);
+
             for (int i = 0; i < expectedBands.Length; i++)
             {
                 var srcDs = bandDatasets[expectedBands[i]];
                 var srcBand = srcDs.GetRasterBand(1);
-                float[] buffer = new float[xSize * ySize];
-                srcBand.ReadRaster(0, 0, xSize, ySize, buffer, xSize, ySize, 0, 0);
-                outDs.GetRasterBand(i + 1).WriteRaster(0, 0, xSize, ySize, buffer, xSize, ySize, 0, 0);
+
+                // ZMIANA 3: Odczyt oryginalnych wymiarów aktualnego pasma (może to być 20m)
+                int srcXSize = srcBand.XSize;
+                int srcYSize = srcBand.YSize;
+
+                float[] buffer = new float[targetXSize * targetYSize];
+
+                // MAGIA GDAL: Jeśli srcX/Y są mniejsze niż targetX/Y, GDAL sam przeskaluje obraz w pamięci!
+                srcBand.ReadRaster(0, 0, srcXSize, srcYSize, buffer, targetXSize, targetYSize, 0, 0);
+
+                outDs.GetRasterBand(i + 1).WriteRaster(0, 0, targetXSize, targetYSize, buffer, targetXSize, targetYSize, 0, 0);
             }
 
             double[] geoTransform = new double[6];

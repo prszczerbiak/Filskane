@@ -85,13 +85,14 @@ namespace Filskane.Models
     /// <summary>
     /// Dane wejściowe do wygenerowania wizualizacji graficznej (PNG) indeksu NDVI.
     /// </summary>
-    /// <param name="NdviMatrix">Macierz wartości NDVI.</param>
+    /// <param name="IndexMatrix">Macierz wartości NDVI.</param>
     /// <param name="FieldBbox">Opcjonalne granice pola w formacie string.</param>
     /// <param name="Bbox">Opcjonalne granice obrazu.</param>
-    public record NdviVisualizationDto(
-        List<List<double>> NdviMatrix,
+    public record IndexVisualizationDto(
+        List<List<double>> IndexMatrix,
         string? FieldBbox,
-        Bbox? Bbox
+        Bbox? Bbox,
+        string? AnalysisType = null
     );
 
     /// <summary>
@@ -117,8 +118,10 @@ namespace Filskane.Models
     /// </summary>
     public record NdviGroupRequestDto
     {
+        public int PlantId { get; init; }
         public int CycleId { get; init; }
-        public List<List<double>> Ndvi { get; init; } = [];
+        public List<List<double>> VegetationIndex { get; init; } = [];
+        public string AnalysisType { get; init; } = "NDVI";
         public string? FieldGeojson { get; init; }
         public Bbox? ImageBbox { get; init; }
         public bool DarkMode { get; init; } = false;
