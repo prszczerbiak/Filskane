@@ -54,6 +54,32 @@ public class FieldController : ControllerBase
         }
     }
 
+    [HttpPost("overallAnalysis/{fieldId}")]
+    public async Task<IActionResult> GetOverallAnalysisBaseScan(int fieldId, [FromBody] ScanRequestDto request)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        try
+        {
+            var result = await _analysisService.PrepareOverallAnalysisAsync(username, fieldId, request.Geojson);
+
+            if (result.PngBytes == null)
+            {
+                Response.Headers.Append("X-Scan-Date", "Brak danych");
+                return NoContent();
+            }
+
+            Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
+            return File(result.PngBytes, "image/png");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd przygotowania całościowej analizy dla pola {FieldId}", fieldId);
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
     /// <summary>
     /// Aktualizuje dane podstawowe pola (np. nazwa, typ uprawy).
     /// </summary>

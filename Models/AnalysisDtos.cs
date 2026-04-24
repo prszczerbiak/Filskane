@@ -113,6 +113,13 @@ namespace Filskane.Models
         [property: JsonPropertyName("ndvi_means")] Dictionary<string, double> NdviMeans
     );
 
+    public record MultiIndexGroupingResultDto(
+        [property: JsonPropertyName("combined_classes")] int[][] CombinedClasses,
+        [property: JsonPropertyName("cluster_ids")] int[] ClusterIds,
+        [property: JsonPropertyName("cluster_means")] Dictionary<string, double> ClusterMeans,
+        [property: JsonPropertyName("cluster_points")] int[][] ClusterPoints
+    );
+
     /// <summary>
     /// Parametry żądania o pogrupowanie (klasteryzację) danych NDVI.
     /// </summary>

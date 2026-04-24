@@ -45,6 +45,7 @@
                             <button class="btn-action" data-analysis="SAVI">SAVI</button>
                             <button class="btn-action" data-analysis="NDWI">NDWI</button>
                             <button class="btn-action" data-analysis="EVI">EVI</button>
+                            <button type="button" class="btn-overall-analysis">Całościowa analiza</button>
                         </div>
                     </div>
 
@@ -182,6 +183,33 @@
             <h3>Podgląd RGB</h3>
             <div class="nvdiPicture">
                 <img id="rgbImage" alt="Obraz RGB">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-close">Zamknij</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="overallAnalysisModal" class="modal">
+        <div class="nvdiModal-content">
+            <h3>Całościowa analiza</h3>
+            <div class="nvdiPicture">
+                <div id="overallAnalysisLoader" class="loader">Ładowanie...</div>
+                <img id="overallAnalysisImage" alt="Obraz RGB" style="display:none;" />
+                <div id="overallAnalysisNoData" style="display:none; text-align:center;">
+                    <p>Brak danych do analizy.</p>
+                </div>
+                <div id="overallAnalysisLegend" class="overall-legend" style="display:none;">
+                    <h4>Legenda nakładki</h4>
+                    <div class="overall-legend-grid">
+                        <div class="overall-legend-item"><span class="legend-swatch legend-good"></span><span>Dobry stan</span></div>
+                        <div class="overall-legend-item"><span class="legend-swatch legend-mid"></span><span>Zadowalający</span></div>
+                        <div class="overall-legend-item"><span class="legend-swatch legend-ndvi"></span><span>Zagrożenie NDVI</span></div>
+                        <div class="overall-legend-item"><span class="legend-swatch legend-gndvi"></span><span>Zagrożenie GNDVI</span></div>
+                        <div class="overall-legend-item"><span class="legend-swatch legend-ndwi"></span><span>Zagrożenie NDWI</span></div>
+                        <div class="overall-legend-item"><span class="legend-swatch legend-combined"></span><span>Zagrożenie NDWI + GNDVI</span></div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn-close">Zamknij</button>

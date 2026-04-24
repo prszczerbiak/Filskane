@@ -71,6 +71,66 @@ public class PythonService
         }
     }
 
+    public MultiIndexGroupingResultDto RunMultiIndexGrouping(
+        List<List<double>> ndvi,
+        List<List<double>> gndvi,
+        List<List<double>> ndwi,
+        double[][] fieldPoints,
+        double ndviMin,
+        double ndviMax,
+        double gndviMin,
+        double gndviMax,
+        double ndwiMin,
+        double ndwiMax)
+    {
+        double eps = _configuration.GetValue<double>("AlgorithmSettings:Eps", 2.0);
+        int minSamples = _configuration.GetValue<int>("AlgorithmSettings:MinSamples", 3);
+
+        using (Py.GIL())
+        {
+            try
+            {
+                dynamic sys = Py.Import("sys");
+                dynamic path = sys.path;
+                path.append(_scriptPath);
+
+                dynamic module = Py.Import("ndvi_entry");
+
+                string payload = JsonSerializer.Serialize(new
+                {
+                    ndvi,
+                    gndvi,
+                    ndwi,
+                    field_points = fieldPoints,
+                    thresholds = new
+                    {
+                        ndvi = new { min = ndviMin, max = ndviMax },
+                        gndvi = new { min = gndviMin, max = gndviMax },
+                        ndwi = new { min = ndwiMin, max = ndwiMax }
+                    },
+                    eps,
+                    min_samples = minSamples,
+                    ellipse_h = 3,
+                    ellipse_w = 4
+                });
+
+                string resultJson = module.multi_index_grouping(payload);
+                var result = JsonSerializer.Deserialize<MultiIndexGroupingResultDto>(resultJson);
+
+                return result ?? new MultiIndexGroupingResultDto(
+                    Array.Empty<int[]>(),
+                    Array.Empty<int>(),
+                    new Dictionary<string, double>(),
+                    Array.Empty<int[]>()
+                );
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Błąd wykonania grupowania wielowskaźnikowego w Pythonie: {ex.Message}", ex);
+            }
+        }
+    }
+
     /// <summary>
     /// Uruchamia algorytm DBSCAN zaimplementowany w skrypcie Python (moduł 'ndvi_entry').
     /// </summary>

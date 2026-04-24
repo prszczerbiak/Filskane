@@ -79,12 +79,18 @@ document.addEventListener("DOMContentLoaded", () => {
         historyTbody: document.querySelector('#scanHistoryTable tbody'),
         modalRgb: document.getElementById('rgbModal'),
         imgRgb: document.getElementById('rgbImage'),
+        modalOverallAnalysis: document.getElementById('overallAnalysisModal'),
+        overallAnalysisLoader: document.getElementById('overallAnalysisLoader'),
+        overallAnalysisImage: document.getElementById('overallAnalysisImage'),
+        overallAnalysisNoData: document.getElementById('overallAnalysisNoData'),
+        overallAnalysisLegend: document.getElementById('overallAnalysisLegend'),
 
         // Przyciski i Kontrolki
         btnImport: document.getElementById('importBtn'),
         inputTiff: document.getElementById('tiffInput'),
         btnAnalysis: document.getElementById('analysisBtn'),
         analysisDropdown: document.getElementById('analysisDropdown'),
+        btnOverallAnalysis: document.querySelector('.btn-overall-analysis'),
         btnHistory: document.getElementById('historyBtn'),
         btnClustering: document.getElementById('clusteringBtn'),
         btnEditCrop: document.querySelector('.edit-btn[data-target="cropModal"]'),
@@ -102,6 +108,43 @@ document.addEventListener("DOMContentLoaded", () => {
         if (savedTheme === 'dark') {
             document.documentElement.classList.add('dark-theme');
         }
+
+    async function showOverallAnalysis() {
+        openModal(UI.modalOverallAnalysis);
+
+        if (UI.overallAnalysisLoader) UI.overallAnalysisLoader.style.display = 'block';
+        if (UI.overallAnalysisImage) {
+            UI.overallAnalysisImage.style.display = 'none';
+            UI.overallAnalysisImage.src = '';
+        }
+        if (UI.overallAnalysisNoData) UI.overallAnalysisNoData.style.display = 'none';
+
+        try {
+            const res = await apiCall(`/overallAnalysis/${CONFIG.FIELD_ID}`, 'POST', {
+                geojson: STATE.fieldData.geojson
+            });
+
+            if (res.status === 204) {
+                if (UI.overallAnalysisNoData) UI.overallAnalysisNoData.style.display = 'block';
+                return;
+            }
+
+            if (!res || !res.ok) throw new Error(await res.text());
+
+            const blob = await res.blob();
+            if (UI.overallAnalysisImage) {
+                UI.overallAnalysisImage.src = URL.createObjectURL(blob);
+                UI.overallAnalysisImage.style.display = 'block';
+            }
+        } catch (err) {
+            if (UI.overallAnalysisNoData) {
+                UI.overallAnalysisNoData.innerHTML = `<p>${err.message}</p>`;
+                UI.overallAnalysisNoData.style.display = 'block';
+            }
+        } finally {
+            if (UI.overallAnalysisLoader) UI.overallAnalysisLoader.style.display = 'none';
+        }
+    }
 
         if (UI.imgColorbar) {
             UI.imgColorbar.src = (savedTheme === 'dark') ? 'css/colorbarDark.png' : 'css/colorbar.png';
@@ -469,6 +512,47 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    async function showOverallAnalysis() {
+        openModal(UI.modalOverallAnalysis);
+
+        if (UI.overallAnalysisLoader) UI.overallAnalysisLoader.style.display = 'block';
+        if (UI.overallAnalysisNoData) UI.overallAnalysisNoData.style.display = 'none';
+        if (UI.overallAnalysisLegend) UI.overallAnalysisLegend.style.display = 'none';
+        if (UI.overallAnalysisImage) {
+            UI.overallAnalysisImage.style.display = 'none';
+            UI.overallAnalysisImage.src = '';
+        }
+
+        try {
+            const res = await apiCall(`/overallAnalysis/${CONFIG.FIELD_ID}`, 'POST', {
+                geojson: STATE.fieldData.geojson
+            });
+
+            if (res && res.status === 204) {
+                if (UI.overallAnalysisNoData) UI.overallAnalysisNoData.style.display = 'block';
+                return;
+            }
+
+            if (!res || !res.ok) throw new Error(await res.text());
+
+            const blob = await res.blob();
+            if (UI.overallAnalysisImage) {
+                UI.overallAnalysisImage.src = URL.createObjectURL(blob);
+                UI.overallAnalysisImage.style.display = 'block';
+            }
+            if (UI.overallAnalysisLegend) {
+                UI.overallAnalysisLegend.style.display = 'block';
+            }
+        } catch (err) {
+            if (UI.overallAnalysisNoData) {
+                UI.overallAnalysisNoData.innerHTML = `<p>${err.message}</p>`;
+                UI.overallAnalysisNoData.style.display = 'block';
+            }
+        } finally {
+            if (UI.overallAnalysisLoader) UI.overallAnalysisLoader.style.display = 'none';
+        }
+    }
+
     // ============================================================
     // 7. OBSŁUGA ZDARZEŃ I MODALI (BEZPIECZNA)
     // ============================================================
@@ -584,6 +668,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 runAnalysis(type);
                 UI.analysisDropdown.style.display = 'none';
             });
+        });
+    }
+
+    if (UI.btnOverallAnalysis) {
+        UI.btnOverallAnalysis.addEventListener('click', () => {
+            showOverallAnalysis();
+            if (UI.analysisDropdown) UI.analysisDropdown.style.display = 'none';
         });
     }
 

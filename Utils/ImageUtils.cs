@@ -14,6 +14,9 @@ namespace Filskane.Utils;
 /// </summary>
 public static class ImageUtils
 {
+    private static readonly Rgba32 HealthyOverlayColor = new(0, 255, 0, 100);
+    private static readonly Rgba32 WarningOverlayColor = new(255, 255, 0, 100);
+
     #region Public Methods
     /// <summary>
     /// Funkcja konwertująca obraz formatu tiff z png
@@ -74,6 +77,48 @@ public static class ImageUtils
             Gdal.Unlink(memPath);
         }
     }
+
+    /// <summary>
+    /// Tworzy nakładkę dla macierzy klas wielowskaźnikowych.
+    /// Klasy: 0-dobry, 1-zadowalający, 2-zagrożenie NDVI, 3-zagrożenie GNDVI, 4-zagrożenie NDWI, 5-zagrożenie łączone.
+    /// </summary>
+    /// <param name="classMatrix">Macierz klas pikseli.</param>
+    /// <returns>Tablica bajtowa PNG z przezroczystą nakładką.</returns>
+    public static byte[] CreateMultiIndexOverlay(int[][] classMatrix)
+    {
+        int height = classMatrix.Length;
+        if (height == 0)
+            return Array.Empty<byte>();
+
+        int width = classMatrix[0].Length;
+        using var image = new Image<Rgba32>(width, height);
+        image.Mutate(ctx => ctx.Fill(new Rgba32(0, 0, 0, 0)));
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                Rgba32 color = classMatrix[y][x] switch
+                {
+                    0 => new Rgba32(0, 255, 0, 110),       // dobry - zielony
+                    1 => new Rgba32(255, 255, 0, 110),     // zadowalający - żółty
+                    2 => new Rgba32(139, 69, 19, 140),     // zagrożenie NDVI - brązowy
+                    3 => new Rgba32(255, 0, 255, 140),     // zagrożenie GNDVI - magenta
+                    4 => new Rgba32(0, 162, 255, 140),     // zagrożenie NDWI - #00A2FF
+                    5 => new Rgba32(255, 0, 0, 150),       // zagrożenie NDWI + GNDVI - czerwony
+                    _ => new Rgba32(0, 0, 0, 0)
+                };
+
+                if (color.A > 0)
+                    image[x, y] = color;
+            }
+        }
+
+        using var ms = new MemoryStream();
+        image.SaveAsPng(ms);
+        return ms.ToArray();
+    }
+
     /// <summary>
     /// Funkcja rysująca obrys pola na zdjęciu png
     /// </summary>
@@ -159,8 +204,8 @@ public static class ImageUtils
             int label = labels[i];
 
             Rgba32 color;
-            if (label == 0) color = new Rgba32(0, 255, 0, 100);
-            else if (label == 1) color = new Rgba32(255, 255, 0, 100);
+            if (label == 0) color = HealthyOverlayColor;
+            else if (label == 1) color = WarningOverlayColor;
             else {
                 string key = label.ToString();
                 double clusterMean = means.TryGetValue(key, out double value) ? value : 0.0;
@@ -210,8 +255,8 @@ public static class ImageUtils
             ctx.DrawText("Legenda Ryzyka", titleFont, textColor, new PointF(10, y));
             y += 35;
 
-            DrawLegendItem(ctx, new Rgba32(57, 255, 20, 255), "Zdrowe (Wysokie NDVI)", ref y, font, textColor);
-            DrawLegendItem(ctx, Color.Yellow, "Ostrzegawcze (Średnie)", ref y, font, textColor);
+            DrawLegendItem(ctx, new Rgba32(HealthyOverlayColor.R, HealthyOverlayColor.G, HealthyOverlayColor.B, 255), "Zdrowe (Wysokie NDVI)", ref y, font, textColor);
+            DrawLegendItem(ctx, new Rgba32(WarningOverlayColor.R, WarningOverlayColor.G, WarningOverlayColor.B, 255), "Ostrzegawcze (Średnie)", ref y, font, textColor);
 
             if (riskClusters.Count > 0)
             {
@@ -297,26 +342,23 @@ public static class ImageUtils
     /// <returns>Kolor w formacie RGB</returns>
     /// <exception cref="ArgumentException"></exception>
     private static Rgba32 GetColorBySeverity(double meanNdvi, double maxThreshold)
+{
+    if (maxThreshold <= 0.0001)
     {
-        // WALIDACJA: Wymagamy podania poprawnego progu.
-        // Jeśli maxBadNdvi jest 0 lub ujemne (np. nieprzypisane), błąd.
-        if (maxThreshold <= 0.0001) // Używamy małej delty dla double
-        {
-            throw new ArgumentException(
-                "Parametr 'maxBadNdvi' jest wymagany i musi być większy od 0. Sprawdź konfigurację algorytmu.",
-                nameof(maxThreshold)
-            );
-        }
-
-
-        double t = Math.Clamp(meanNdvi / maxThreshold, 0.0, 1.0);
-
-        byte r = (byte)(255 * t);
-        byte g = (byte)(42 * t);
-        byte b = (byte)(46 * t);
-
-        return new Rgba32(r, g, b, 200);
+        throw new ArgumentException(
+            "Parametr 'maxBadNdvi' jest wymagany i musi być większy od 0. Sprawdź konfigurację algorytmu.",
+            nameof(maxThreshold)
+        );
     }
+
+    double t = Math.Clamp(meanNdvi / maxThreshold, 0.0, 1.0);
+
+    byte r = (byte)(255 * t);
+    byte g = (byte)(42 * t);
+    byte b = (byte)(46 * t);
+
+    return new Rgba32(r, g, b, 200);
+}
 
     #endregion
 }

@@ -54,6 +54,66 @@ public class AnalysisService
         return (rgbImage, scan.ScanDate);
     }
 
+    public async Task<(byte[]? PngBytes, DateTime? Date)> PrepareOverallAnalysisAsync(string username, int fieldId, string geojson)
+    {
+        ScanResultDto? scan = await _scanDal.GetLatestScanAsync(username, fieldId);
+
+        if (scan == null || scan.ImageBytes == null || scan.ImageBytes.Length == 0)
+            return (null, null);
+
+        var field = await _fieldDal.GetUserFieldByIdAsync(username, fieldId)
+            ?? throw new Exception("Nie znaleziono pola.");
+
+        if (!field.CropId.HasValue || !field.PlantStateId.HasValue)
+            throw new Exception("Brak przypisanej uprawy lub fazy rozwoju dla pola.");
+
+        var ndvi = ImageUtils.ConvertToNestedList(NdviUtils.CalculateNdvi(scan.ImageBytes));
+        var ndwi = ImageUtils.ConvertToNestedList(NdviUtils.CalculateNdwi(scan.ImageBytes));
+        var gndvi = ImageUtils.ConvertToNestedList(NdviUtils.CalculateGndvi(scan.ImageBytes));
+
+        int height = ndvi.Count;
+        int width = height > 0 ? ndvi[0].Count : 0;
+        var fieldPixels = (scan.FieldBbox != null && width > 0 && height > 0)
+            ? GeoUtils.GetPixelsInsidePolygonAsArray(field.Geojson, scan.FieldBbox, width, height)
+            : Array.Empty<double[]>();
+
+        var ndviThreshold = await _fieldDal.GetThresholdAsync(field.CropId.Value, field.PlantStateId.Value, "NDVI");
+        var gndviThreshold = await _fieldDal.GetThresholdAsync(field.CropId.Value, field.PlantStateId.Value, "GNDVI");
+        var ndwiThreshold = await _fieldDal.GetThresholdAsync(field.CropId.Value, field.PlantStateId.Value, "NDWI");
+
+        var groupingResult = _pythonService.RunMultiIndexGrouping(
+            ndvi,
+            gndvi,
+            ndwi,
+            fieldPixels,
+            ndviThreshold?.MinNdvi ?? 0.2,
+            ndviThreshold?.MaxNdvi ?? 0.6,
+            gndviThreshold?.MinNdvi ?? 0.2,
+            gndviThreshold?.MaxNdvi ?? 0.6,
+            ndwiThreshold?.MinNdvi ?? 0.2,
+            ndwiThreshold?.MaxNdvi ?? 0.6
+        );
+
+        var classMatrix = groupingResult.CombinedClasses;
+
+        var rgbImage = ImageUtils.ConvertTiffToPng(scan.ImageBytes);
+        if (classMatrix.Length > 0)
+        {
+            var overlayBytes = ImageUtils.CreateMultiIndexOverlay(classMatrix);
+            if (overlayBytes.Length > 0)
+            {
+                rgbImage = ImageUtils.CombineImages(rgbImage, overlayBytes);
+            }
+        }
+
+        if (scan.FieldBbox != null)
+        {
+            rgbImage = ImageUtils.DrawGeoJsonPolygonOnImage(rgbImage, geojson, scan.FieldBbox, false);
+        }
+
+        return (rgbImage, scan.ScanDate);
+    }
+
     /// <summary>
     /// Pobiera surowe dane numeryczne NDVI dla skanu.
     /// </summary>
