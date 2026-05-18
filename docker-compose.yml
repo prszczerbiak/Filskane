@@ -1,0 +1,7 @@
+services:
+  python-service:
+    build:
+      context: ./python-service
+    ports:
+      - "8000:8000"
+    restart: unless-stopped

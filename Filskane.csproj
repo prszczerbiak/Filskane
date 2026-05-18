@@ -23,7 +23,6 @@
     <PackageReference Include="MaxRev.Gdal.WindowsRuntime.Minimal" Version="3.11.4.376" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.3" />
     <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.7.0" />
-    <PackageReference Include="pythonnet" Version="3.0.5" />
     <PackageReference Include="ScottPlot" Version="5.1.57" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.7" />

@@ -90,8 +90,8 @@ builder.Services.AddScoped<EmailService>();
 
 builder.Services.AddHttpClient();
 
-// Integracja z interpreterem jêzyka Python (Singleton - inicjalizacja silnika raz na start aplikacji)
-builder.Services.AddSingleton<PythonService>();
+// Integracja z mikroserwisem Python przez HTTP.
+builder.Services.AddHttpClient<PythonService>();
 
 // Konfiguracja mechanizmu uwierzytelniania JWT Bearer
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
