@@ -6,6 +6,7 @@ using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using Filskane.Models;
 using MaxRev.Gdal.Core;
+using System.Buffers;
 
 namespace Filskane.Utils;
 
@@ -24,7 +25,7 @@ public static class ImageUtils
     /// <param name="tiffBytes">Tablica bajtowa zawierająca obraz tiff</param>
     /// <returns>Zwraca tablicę bajtową zawierającą obraz w formacie png</returns>
     /// <exception cref="Exception"></exception>
-    public static byte[] ConvertTiffToPng(byte[] tiffBytes)
+    public static unsafe byte[] ConvertTiffToPng(byte[] tiffBytes)
     {
         string memPath = $"/vsimem/img_convert_{Guid.NewGuid()}.tif";
 
@@ -36,41 +37,90 @@ public static class ImageUtils
 
             int w = ds.RasterXSize;
             int h = ds.RasterYSize;
+            int size = w * h;
 
             using var bandBlue = ds.GetRasterBand(1);
             using var bandGreen = ds.GetRasterBand(2);
             using var bandRed = ds.GetRasterBand(3);
 
-            int[] rBuffer = new int[w * h];
-            int[] gBuffer = new int[w * h];
-            int[] bBuffer = new int[w * h];
 
-            bandRed.ReadRaster(0, 0, w, h, rBuffer, w, h, 0, 0);
-            bandGreen.ReadRaster(0, 0, w, h, gBuffer, w, h, 0, 0);
-            bandBlue.ReadRaster(0, 0, w, h, bBuffer, w, h, 0, 0);
+            int[] rBuffer = ArrayPool<int>.Shared.Rent(size);
+            int[] gBuffer = ArrayPool<int>.Shared.Rent(size);
+            int[] bBuffer = ArrayPool<int>.Shared.Rent(size);
 
-            using var image = new Image<Rgb24>(w, h);
-
-            image.ProcessPixelRows(accessor =>
+            try
             {
-                for (int y = 0; y < h; y++)
+                fixed (int* rPtr = rBuffer, gPtr = gBuffer, bPtr = bBuffer)
                 {
-                    var pixelRow = accessor.GetRowSpan(y);
-                    int rowOffset = y * w;
-                    for (int x = 0; x < w; x++)
-                    {
-                        int i = rowOffset + x;
-                        byte r = (byte)Math.Min((rBuffer[i] * 255f) / 16383f, 255);
-                        byte g = (byte)Math.Min((gBuffer[i] * 255f) / 16383f, 255);
-                        byte b = (byte)Math.Min((bBuffer[i] * 255f) / 16383f, 255);
-                        pixelRow[x] = new Rgb24(r, g, b);
-                    }
-                }
-            });
+                    bandRed.ReadRaster(0, 0, w, h, (IntPtr)rPtr, w, h, DataType.GDT_Int32, 0, 0);
+                    bandGreen.ReadRaster(0, 0, w, h, (IntPtr)gPtr, w, h, DataType.GDT_Int32, 0, 0);
+                    bandBlue.ReadRaster(0, 0, w, h, (IntPtr)bPtr, w, h, DataType.GDT_Int32, 0, 0);
 
-            using var ms = new MemoryStream();
-            image.SaveAsPng(ms);
-            return ms.ToArray();
+
+                    byte* lut = stackalloc byte[16384];
+
+                    nint lutPointer = (nint)lut;
+                    nint rPointer = (nint)rPtr;
+                    nint gPointer = (nint)gPtr;
+                    nint bPointer = (nint)bPtr;
+
+                    for (int i = 0; i < 16384; i++)
+                    {
+                        lut[i] = (byte)Math.Min((i * 255f) / 16383f, 255);
+                    }
+
+                    using var image = new Image<Rgb24>(w, h);
+
+                    image.ProcessPixelRows(accessor =>
+                    {
+                        byte* localLut = (byte*)lutPointer;
+                        int* localR = (int*)rPointer;
+                        int* localG = (int*)gPointer;
+                        int* localB = (int*)bPointer;
+
+                        for (int y = 0; y < h; y++)
+                        {
+                            var pixelRow = accessor.GetRowSpan(y);
+                            int rowOffset = y * w;
+                            int* currentR = localR + rowOffset;
+                            int* currentG = localG + rowOffset;
+                            int* currentB = localB + rowOffset;
+
+                            fixed (Rgb24* destRow = pixelRow)
+                            {
+                                Rgb24* dest = destRow;
+
+                                for (int x = 0; x < w; x++)
+                                {
+                                    int clampR = Math.Clamp(*currentR, 0, 16383);
+                                    int clampG = Math.Clamp(*currentG, 0, 16383);
+                                    int clampB = Math.Clamp(*currentB, 0, 16383);
+
+                                    dest->R = localLut[clampR];
+                                    dest->G = localLut[clampG];
+                                    dest->B = localLut[clampB];
+
+                                    currentR++;
+                                    currentG++;
+                                    currentB++;
+                                    dest++;
+                                }
+                            }
+                        }
+                    });
+
+                    using var ms = new MemoryStream();
+                    image.SaveAsPng(ms);
+                    return ms.ToArray();
+                }
+            }
+            finally
+            {
+                ArrayPool<int>.Shared.Return(rBuffer);
+                ArrayPool<int>.Shared.Return(gBuffer);
+                ArrayPool<int>.Shared.Return(bBuffer);
+            }
+            
         }
         finally
         {
