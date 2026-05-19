@@ -134,7 +134,7 @@ public static class ImageUtils
     /// </summary>
     /// <param name="classMatrix">Macierz klas pikseli.</param>
     /// <returns>Tablica bajtowa PNG z przezroczystą nakładką.</returns>
-    public static byte[] CreateMultiIndexOverlay(int[][] classMatrix)
+    public static unsafe byte[] CreateMultiIndexOverlay(int[][] classMatrix)
     {
         int height = classMatrix.Length;
         if (height == 0)
@@ -142,28 +142,41 @@ public static class ImageUtils
 
         int width = classMatrix[0].Length;
         using var image = new Image<Rgba32>(width, height);
-        image.Mutate(ctx => ctx.Fill(new Rgba32(0, 0, 0, 0)));
 
-        for (int y = 0; y < height; y++)
+        
+        image.ProcessPixelRows(accessor =>
         {
-            for (int x = 0; x < width; x++)
+            Rgba32* colorLut = stackalloc Rgba32[7]
             {
-                Rgba32 color = classMatrix[y][x] switch
+                new Rgba32(0, 255, 0, 110),       // dobry - zielony
+                new Rgba32(255, 255, 0, 110),     // zadowalający - żółty
+                new Rgba32(139, 69, 19, 140),     // zagrożenie NDVI - brązowy
+                new Rgba32(255, 0, 255, 140),     // zagrożenie GNDVI - magenta
+                new Rgba32(0, 162, 255, 140),     // zagrożenie NDWI - #00A2FF
+                new Rgba32(255, 0, 0, 150),        // zagrożenie NDWI + GNDVI - czerwony
+                new Rgba32(0, 0, 0, 0)
+            };
+            for (int y = 0; y < height; y++)
+            {
+                Span<Rgba32> pixelRow = accessor.GetRowSpan(y);
+                int[] matrixRow = classMatrix[y];
+
+                fixed (int* srcPtr = matrixRow)
+                fixed(Rgba32* dstPtr = pixelRow)
                 {
-                    0 => new Rgba32(0, 255, 0, 110),       // dobry - zielony
-                    1 => new Rgba32(255, 255, 0, 110),     // zadowalający - żółty
-                    2 => new Rgba32(139, 69, 19, 140),     // zagrożenie NDVI - brązowy
-                    3 => new Rgba32(255, 0, 255, 140),     // zagrożenie GNDVI - magenta
-                    4 => new Rgba32(0, 162, 255, 140),     // zagrożenie NDWI - #00A2FF
-                    5 => new Rgba32(255, 0, 0, 150),       // zagrożenie NDWI + GNDVI - czerwony
-                    _ => new Rgba32(0, 0, 0, 0)
-                };
-
-                if (color.A > 0)
-                    image[x, y] = color;
+                    int* src = srcPtr;
+                    Rgba32* dst = dstPtr;
+                    for (int x = 0; x < width; x++)
+                    {
+                        uint val = (uint)(*src);
+                        int safeIndex = val < 6u ? (int)val : 6;
+                        *dst = colorLut[safeIndex];
+                        src++;
+                        dst++;
+                    }
+                }
             }
-        }
-
+        });
         using var ms = new MemoryStream();
         image.SaveAsPng(ms);
         return ms.ToArray();
@@ -179,36 +192,28 @@ public static class ImageUtils
     /// <returns>Tablica bajtowa z obrazem png i naniesionym na nim zarysie pola</returns>
     public static byte[] DrawGeoJsonPolygonOnImage(byte[] imageBytes, string geoJson, Bbox? bbox, bool isThick)
     {
-        Console.WriteLine(geoJson);
-        Console.WriteLine(bbox);
-        using var image = Image.Load(imageBytes);
+
 
         if (bbox == null)
-        {
-            Console.WriteLine("DEBUG: Bbox jest NULL! Nie mogę rysować.");
-        }
-        else
-        {
-            var points = GeoUtils.GetPolygonPixels(geoJson, bbox, image.Width, image.Height);
-            Console.WriteLine($"DEBUG: Znaleziono {points.Count} punktów do narysowania.");
+            return imageBytes;
 
-            if (points.Count > 2)
-            {
-                float thickness = isThick ? 2.5f : 0.5f;
+        var imageInfo = Image.Identify(imageBytes);
+       
+        var points = GeoUtils.GetPolygonPixels(geoJson, bbox, imageInfo.Width, imageInfo.Height);
 
-                Console.WriteLine($"DEBUG: Wymiary obrazka: {image.Width}x{image.Height}");
-                foreach (var p in points)
-                {
-                    Console.WriteLine($"DEBUG PIXEL: X={p.X}, Y={p.Y}");
-                }
+        if (points == null || points.Count <= 2)
+            return imageBytes;
 
-                image.Mutate(ctx => ctx.DrawPolygon(Color.Red, thickness, points.ToArray()));
-            }
-        }
+        using var image = Image.Load(imageBytes);
 
+        float thickness = isThick ? 2.5f : 0.5f;
+
+        image.Mutate(ctx => ctx.DrawPolygon(Color.Red, thickness, points.ToArray()));
+        
         using var ms = new MemoryStream();
         image.SaveAsPng(ms);
         return ms.ToArray();
+        
     }
     /// <summary>
     /// Funkcja nanosząca na zdjęcie nakładkę (wynik klastrowania)
