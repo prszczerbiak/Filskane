@@ -39,9 +39,9 @@ public static class ImageUtils
             int h = ds.RasterYSize;
             int size = w * h;
 
-            using var bandBlue = ds.GetRasterBand(1);
-            using var bandGreen = ds.GetRasterBand(2);
-            using var bandRed = ds.GetRasterBand(3);
+            var bandBlue = ds.GetRasterBand(1);
+            var bandGreen = ds.GetRasterBand(2);
+            var bandRed = ds.GetRasterBand(3);
 
 
             int[] rBuffer = ArrayPool<int>.Shared.Rent(size);
@@ -109,7 +109,7 @@ public static class ImageUtils
                         }
                     });
 
-                    using var ms = new MemoryStream();
+                    using var ms = new MemoryStream(size * 3);
                     image.SaveAsPng(ms);
                     return ms.ToArray();
                 }
@@ -192,14 +192,23 @@ public static class ImageUtils
     /// <returns>Tablica bajtowa z obrazem png i naniesionym na nim zarysie pola</returns>
     public static byte[] DrawGeoJsonPolygonOnImage(byte[] imageBytes, string geoJson, Bbox? bbox, bool isThick)
     {
-
-
         if (bbox == null)
             return imageBytes;
 
-        var imageInfo = Image.Identify(imageBytes);
-       
-        var points = GeoUtils.GetPolygonPixels(geoJson, bbox, imageInfo.Width, imageInfo.Height);
+        int width, height;
+
+        {
+            var imageInfo = Image.Identify(imageBytes);
+            width = imageInfo.Width;
+            height = imageInfo.Height;
+
+            if (imageInfo is IDisposable disposableInfo)
+            {
+                disposableInfo.Dispose();
+            }
+        }
+        
+        var points = GeoUtils.GetPolygonPixels(geoJson, bbox, width, height);
 
         if (points == null || points.Count <= 2)
             return imageBytes;
@@ -210,10 +219,9 @@ public static class ImageUtils
 
         image.Mutate(ctx => ctx.DrawPolygon(Color.Red, thickness, points.ToArray()));
         
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(imageBytes.Length);
         image.SaveAsPng(ms);
         return ms.ToArray();
-        
     }
     /// <summary>
     /// Funkcja nanosząca na zdjęcie nakładkę (wynik klastrowania)
@@ -223,12 +231,19 @@ public static class ImageUtils
     /// <returns>Połączone zdjęcie w tablicy bajtowej</returns>
     public static byte[] CombineImages(byte[] baseBytes, byte[] overlayBytes)
     {
+
+        if(overlayBytes == null || overlayBytes.Length == 0)
+            return baseBytes;
+
+        if(baseBytes == null || baseBytes.Length == 0)
+            return overlayBytes;
+
         using var baseImg = Image.Load<Rgba32>(baseBytes);
         using var overlay = Image.Load<Rgba32>(overlayBytes);
 
         baseImg.Mutate(ctx => ctx.DrawImage(overlay, 1f));
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(baseBytes.Length);
         baseImg.SaveAsPng(ms);
         return ms.ToArray();
     }
@@ -250,32 +265,44 @@ public static class ImageUtils
         int newH = height * scale;
 
         using var image = new Image<Rgba32>(newW, newH);
-        image.Mutate(ctx => ctx.Fill(new Rgba32(0, 0, 0, 0)));
 
-        for (int i = 0; i < points.Length; i++)
-        {
-            int x = (int)points[i][0];
-            int y = (int)points[i][1];
-            int label = labels[i];
+        Dictionary<int, Rgba32> colorCache = new Dictionary<int, Rgba32>();
+        colorCache[0] = HealthyOverlayColor;
+        colorCache[1] = WarningOverlayColor;
 
-            Rgba32 color;
-            if (label == 0) color = HealthyOverlayColor;
-            else if (label == 1) color = WarningOverlayColor;
-            else {
-                string key = label.ToString();
-                double clusterMean = means.TryGetValue(key, out double value) ? value : 0.0;
-
-                color = GetColorBySeverity(clusterMean, maxBadNdvi);
-            }
-
-            if (color.A > 0)
+        if(means != null){
+            foreach(var kvp in means)
             {
-                for (int dy = 0; dy < scale; dy++)
-                    for (int dx = 0; dx < scale; dx++)
-                        image[x * scale + dx, y * scale + dy] = color;
+                if(int.TryParse(kvp.Key, out int clusterId) && clusterId < 0)
+                {
+                    colorCache[clusterId] = GetColorBySeverity(kvp.Value, maxBadNdvi);
+                }
             }
         }
+        
+        image.ProcessPixelRows(accessor =>
+        {
+            for (int i = 0; i < points.Length; i++)
+            {
+                double[] pt = points[i];
+                int x = (int)pt[0];
+                int y = (int)pt[1];
+                int label = labels[i];
 
+                if (colorCache.TryGetValue(label, out Rgba32 color) && color.A > 0)
+                {
+                    int startX = x * scale;
+                    int startY = y * scale;
+                    for (int dy = 0; dy < scale; dy++)
+                    {
+                        Span<Rgba32> pixelRow = accessor.GetRowSpan(startY + dy);
+
+                        pixelRow.Slice(startX, scale).Fill(color);
+                        
+                    }
+                }
+            }
+        });
         using var ms = new MemoryStream();
         image.SaveAsPng(ms);
         return ms.ToArray();
@@ -290,7 +317,7 @@ public static class ImageUtils
     /// <returns>Tablica bajtowa z legendą w formacie png</returns>
     public static byte[] CreateLegendWithClusters(Dictionary<string, double> means, int[] presentClusters, double maxBadNdvi, bool darkMode)
     {
-        var riskClusters = presentClusters.Distinct().Where(id => id < 0).ToList();
+        var riskClusters = presentClusters.Distinct().Where(id => id < 0).OrderByDescending(id => id).ToList();
 
         int h = 170 + (riskClusters.Count * 30);
         int w = 450;
@@ -300,13 +327,14 @@ public static class ImageUtils
         Color bgColor = darkMode ? Color.ParseHex("#2b2b2b") : Color.White;
         Color textColor = darkMode ? Color.White : Color.Black;
 
-        image.Mutate(ctx => ctx.Fill(bgColor));
-
         var font = SystemFonts.CreateFont("Arial", 12);
+        var headerFont = SystemFonts.CreateFont("Arial", 12, FontStyle.Bold);
         var titleFont = SystemFonts.CreateFont("Arial", 14, FontStyle.Bold);
         int y = 20;
 
         image.Mutate(ctx => {
+            ctx.Fill(bgColor);
+
             ctx.DrawText("Legenda Ryzyka", titleFont, textColor, new PointF(10, y));
             y += 35;
 
@@ -316,13 +344,13 @@ public static class ImageUtils
             if (riskClusters.Count > 0)
             {
                 y += 10;
-                ctx.DrawText("Zidentyfikowane Ogniska:", SystemFonts.CreateFont("Arial", 12, FontStyle.Bold), textColor, new PointF(10, y));
+                ctx.DrawText("Zidentyfikowane Ogniska:", headerFont, textColor, new PointF(10, y));
                 y += 25;
 
-                foreach (var clusterId in riskClusters.OrderByDescending(id => id))
+                foreach (var clusterId in riskClusters)
                 {
                     string key = clusterId.ToString();
-                    double val = means.ContainsKey(key) ? means[key] : 0.0;
+                    means.TryGetValue(key, out double val);
 
                     Rgba32 color = GetColorBySeverity(val, maxBadNdvi);
 
@@ -332,43 +360,9 @@ public static class ImageUtils
             }
         });
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(32 * 1024);
         image.SaveAsPng(ms);
         return ms.ToArray();
-    }
-
-    /// <summary>
-    /// Funkcja konwertująca macierz typu double na listę list typu double
-    /// </summary>
-    /// <param name="array">Macierz do przekonwertowania</param>
-    /// <returns>Lista list z danymi macierzy</returns>
-    public static List<List<double>> ConvertToNestedList(double[,] array)
-    {
-        int h = array.GetLength(0);
-        int w = array.GetLength(1);
-        var list = new List<List<double>>(h);
-        for (int y = 0; y < h; y++)
-        {
-            var row = new List<double>(w);
-            for (int x = 0; x < w; x++) row.Add(array[y, x]);
-            list.Add(row);
-        }
-        return list;
-    }
-    /// <summary>
-    /// Funkcja konwertująca listę list double na macierz typu double
-    /// </summary>
-    /// <param name="list">Lista list do przekonwertowania</param>
-    /// <returns>Macierz z danymi listy list</returns>
-    public static double[,] ConvertFromNestedList(List<List<double>> list)
-    {
-        int h = list.Count;
-        int w = list[0].Count;
-        var arr = new double[h, w];
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-                arr[y, x] = list[y][x];
-        return arr;
     }
 
     #endregion
@@ -386,7 +380,8 @@ public static class ImageUtils
     private static void DrawLegendItem(IImageProcessingContext ctx, Color boxColor, string text, ref int y, Font font, Color textColor)
     {
         ctx.Fill(boxColor, new RectangleF(20, y, 20, 20));
-        ctx.DrawText(text, font, textColor, new PointF(50, y + 2));
+        y += 2;
+        ctx.DrawText(text, font, textColor, new PointF(50, y));
         y += 30;
     }
     /// <summary>
@@ -397,23 +392,23 @@ public static class ImageUtils
     /// <returns>Kolor w formacie RGB</returns>
     /// <exception cref="ArgumentException"></exception>
     private static Rgba32 GetColorBySeverity(double meanNdvi, double maxThreshold)
-{
-    if (maxThreshold <= 0.0001)
     {
-        throw new ArgumentException(
-            "Parametr 'maxBadNdvi' jest wymagany i musi być większy od 0. Sprawdź konfigurację algorytmu.",
-            nameof(maxThreshold)
-        );
+        if (maxThreshold <= 0.0001)
+        {
+            throw new ArgumentException(
+                "Parametr 'maxBadNdvi' jest wymagany i musi być większy od 0. Sprawdź konfigurację algorytmu.",
+                nameof(maxThreshold)
+            );
+        }
+
+        double t = Math.Clamp(meanNdvi / maxThreshold, 0.0, 1.0);
+
+        byte r = (byte)(255 * t);
+        byte g = (byte)(42 * t);
+        byte b = (byte)(46 * t);
+
+        return new Rgba32(r, g, b, 200);
     }
-
-    double t = Math.Clamp(meanNdvi / maxThreshold, 0.0, 1.0);
-
-    byte r = (byte)(255 * t);
-    byte g = (byte)(42 * t);
-    byte b = (byte)(46 * t);
-
-    return new Rgba32(r, g, b, 200);
-}
 
     #endregion
 }
