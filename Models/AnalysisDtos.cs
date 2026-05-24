@@ -88,13 +88,13 @@ namespace Filskane.Models
     /// Dane wejściowe do wygenerowania wizualizacji graficznej (PNG) indeksu NDVI.
     /// </summary>
     /// <param name="IndexMatrix">Macierz wartości NDVI.</param>
-    /// <param name="FieldBbox">Opcjonalne granice pola w formacie string.</param>
+    /// <param name="FieldGeoJson">Opcjonalna geometria pola w formacie GeoJSON.</param>
     /// <param name="Bbox">Opcjonalne granice obrazu.</param>
     public record IndexVisualizationDto(
         double[] IndexMatrix,
         int MatrixWidth,
         int MatrixHeight,
-        string? FieldBbox,
+        string? FieldGeoJson,
         Bbox? Bbox,
         string? AnalysisType = null
     );
@@ -143,60 +143,33 @@ namespace Filskane.Models
     /// <summary>
     /// Klasa reprezentująca prostokąt ograniczający (Bounding Box) w układzie współrzędnych geograficznych.
     /// </summary>
-    public class Bbox
+    public readonly record struct Bbox(
+    [property: JsonPropertyName("minX")] double MinX,
+    [property: JsonPropertyName("minY")] double MinY,
+    [property: JsonPropertyName("maxX")] double MaxX,
+    [property: JsonPropertyName("maxY")] double MaxY
+)
     {
         /// <summary>
-        /// Konstruktor bezparametrowy (wymagany do serializacji).
+        /// Opcje serializatora - można wyciągnąć jako statyczne pole, by nie alokować ich za każdym razem.
         /// </summary>
-        public Bbox() { }
-
-        /// <summary>
-        /// Inicjalizuje Bbox z podanymi współrzędnymi skrajnymi.
-        /// </summary>
-        public Bbox(double minX, double minY, double maxX, double maxY)
+        private static readonly JsonSerializerOptions JsonOptions = new()
         {
-            MinX = minX;
-            MinY = minY;
-            MaxX = maxX;
-            MaxY = maxY;
-        }
-
-        [JsonPropertyName("minX")]
-        public double MinX { get; set; }
-
-        [JsonPropertyName("minY")]
-        public double MinY { get; set; }
-
-        [JsonPropertyName("maxX")]
-        public double MaxX { get; set; }
-
-        [JsonPropertyName("maxY")]
-        public double MaxY { get; set; }
+            PropertyNameCaseInsensitive = true
+        };
 
         /// <summary>
-        /// Deserializuje obiekt Bbox z ciągu JSON, obsługując różną wielkość liter w nazwach właściwości.
+        /// Deserializuje obiekt Bbox z ciągu JSON, obsługując różną wielkość liter.
         /// </summary>
         public static Bbox? FromJson(string? json)
         {
             if (string.IsNullOrWhiteSpace(json)) return null;
+
             try
             {
-                using var doc = JsonDocument.Parse(json);
-                var root = doc.RootElement;
-
-                double GetVal(string keyLower, string keyUpper)
-                {
-                    if (root.TryGetProperty(keyLower, out var p1)) return p1.GetDouble();
-                    if (root.TryGetProperty(keyUpper, out var p2)) return p2.GetDouble();
-                    return 0.0;
-                }
-
-                return new Bbox(
-                    GetVal("minX", "MinX"),
-                    GetVal("minY", "MinY"),
-                    GetVal("maxX", "MaxX"),
-                    GetVal("maxY", "MaxY")
-                );
+                // Zamiast ręcznie parsować JsonDocument (co alokuje pamięć na DOM),
+                // zrzucamy to na zoptymalizowany JsonSerializer, dodając niewrażliwość na wielkość liter.
+                return JsonSerializer.Deserialize<Bbox>(json, JsonOptions);
             }
             catch
             {
@@ -209,18 +182,18 @@ namespace Filskane.Models
         /// </summary>
         public static Bbox? FromGdal(Dataset ds)
         {
+            if (ds == null) return null;
+
             double[] gt = new double[6];
             ds.GetGeoTransform(gt);
+
             double minX = gt[0];
             double maxY = gt[3];
             double maxX = minX + (gt[1] * ds.RasterXSize);
             double minY = maxY + (gt[5] * ds.RasterYSize);
-            return new Bbox { MinX = minX, MaxX = maxX, MinY = minY, MaxY = maxY };
-        }
 
-        /// <summary>
-        /// Zwraca reprezentację obiektu w formacie JSON.
-        /// </summary>
-        public override string ToString() => JsonSerializer.Serialize(this);
+            // Zwracamy naszą strukturę przez konstruktor pozycyjny
+            return new Bbox(minX, minY, maxX, maxY);
+        }
     }
 }

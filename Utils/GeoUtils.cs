@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using SixLabors.ImageSharp;
 using Filskane.Models;
+using System.Runtime.CompilerServices;
 
 namespace Filskane.Utils;
 
@@ -20,28 +21,47 @@ public static class GeoUtils
     /// Obiekt <see cref="Bbox"/> reprezentujący skrajne współrzędne geograficzne.
     /// Zwraca <c>null</c>, jeśli GeoJSON jest niepoprawny lub nie zawiera punktów.
     /// </returns>
-    public static Bbox? GetBboxFromGeoJson(string geojson)
+    public static Bbox? GetBboxFromGeoJson(JsonElement geojson)
     {
-        var points = ExtractPointsFromGeoJson(geojson);
-
-        if (points.Count == 0)
+        if (!TryGetExteriorRing(geojson, out JsonElement ring))
             return null;
 
-        double minX = points[0].X;
-        double maxX = points[0].X;
-        double minY = points[0].Y;
-        double maxY = points[0].Y;
+        double minX = double.MaxValue;
+        double maxX = double.MinValue;
+        double minY = double.MaxValue;
+        double maxY = double.MinValue;
+        bool hasPoints = false;
 
-        for (int i = 1; i < points.Count; i++)
+        // The Leap: Błyskawiczna iteracja i wektoryzacja matematyczna bez if'ów
+        foreach (var point in ring.EnumerateArray())
         {
-            var p = points[i];
-            if (p.X < minX) minX = p.X;
-            if (p.X > maxX) maxX = p.X;
-            if (p.Y < minY) minY = p.Y;
-            if (p.Y > maxY) maxY = p.Y;
+            hasPoints = true;
+            double x = point[0].GetDouble();
+            double y = point[1].GetDouble();
+
+            minX = Math.Min(minX, x);
+            maxX = Math.Max(maxX, x);
+            minY = Math.Min(minY, y);
+            maxY = Math.Max(maxY, y);
         }
 
+        if (!hasPoints) return null;
         return new Bbox(minX, minY, maxX, maxY);
+    }
+
+    public static Bbox? GetBboxFromGeoJson(string geojson)
+    {
+        if (string.IsNullOrWhiteSpace(geojson)) return null;
+
+        try
+        {
+            using var document = JsonDocument.Parse(geojson);
+            return GetBboxFromGeoJson(document.RootElement);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>
@@ -52,14 +72,10 @@ public static class GeoUtils
     /// <returns>
     /// <c>true</c>, jeśli granice pola mieszczą się całkowicie wewnątrz rastra.
     /// </returns>
-    public static bool IsFieldWithinRaster(Bbox rasterBbox, string fieldGeoJson)
+    public static bool IsFieldWithinRaster(Bbox? rasterBbox, JsonElement fieldGeoJson)
     {
-        if (rasterBbox == null) return false;
-
-        var fieldBbox = GetBboxFromGeoJson(fieldGeoJson);
-        if (fieldBbox == null) return false;
-
-        return fieldBbox.MinX >= rasterBbox.MinX &&
+        return rasterBbox is not null && GetBboxFromGeoJson(fieldGeoJson) is {} fieldBbox &&
+                fieldBbox.MinX >= rasterBbox.MinX &&
                 fieldBbox.MaxX <= rasterBbox.MaxX &&
                 fieldBbox.MinY >= rasterBbox.MinY &&
                 fieldBbox.MaxY <= rasterBbox.MaxY;
@@ -73,21 +89,25 @@ public static class GeoUtils
     /// <param name="imgWidth">Szerokość obrazu w pikselach.</param>
     /// <param name="imgHeight">Wysokość obrazu w pikselach.</param>
     /// <returns>Lista punktów <see cref="PointF"/> w układzie współrzędnych obrazu.</returns>
-    public static List<PointF> GetPolygonPixels(string geoJson, Bbox rasterBbox, int imgWidth, int imgHeight)
+    public static PointF[] GetPolygonPixels(JsonElement geoJson, Bbox? rasterBbox, int imgWidth, int imgHeight)
     {
-        var resultPoints = new List<PointF>();
+        
+        if (rasterBbox is not { } raster || !TryGetExteriorRing(geoJson, out JsonElement ring))
+        return Array.Empty<PointF>();
 
-        if (rasterBbox == null) return resultPoints;
+        var resultPoints = new PointF[ring.GetArrayLength()];
 
-        var geoPoints = ExtractPointsFromGeoJson(geoJson);
+        float dX = (float)((rasterBbox.MaxX.Value - rasterBbox.MinX.Value) / imgWidth);
+        float dY = (float)((rasterBbox.MaxY.Value - rasterBbox.MinY.Value) / imgHeight);
 
-        foreach (var coord in geoPoints)
+        int i = -1;
+        foreach (var point in ring.EnumerateArray())
         {
-            float px = (float)((coord.X - rasterBbox.MinX) / (rasterBbox.MaxX - rasterBbox.MinX) * imgWidth);
-
-            float py = (float)((rasterBbox.MaxY - coord.Y) / (rasterBbox.MaxY - rasterBbox.MinY) * imgHeight);
-
-            resultPoints.Add(new PointF(px, py));
+            double x = point[0].GetDouble();
+            double y = point[1].GetDouble();
+            float px = (float)((x - rasterBbox.MinX.Value) / dX);
+            float py = (float)((rasterBbox.MaxY.Value - y) / dY);
+            resultPoints[++i] = new PointF(px, py);
         }
 
         return resultPoints;
@@ -101,21 +121,26 @@ public static class GeoUtils
     /// <param name="imgWidth">Szerokość zdjęcia</param>
     /// <param name="imgHeight">Wyokość zdjęcia</param>
     /// <returns>Tablica zawierająca współrzędne punktów leżacych w granicy pola</returns>
-    public static double[][] GetPixelsInsidePolygonAsArray(string geoJson, Bbox rasterBbox, int imgWidth, int imgHeight)
+    public static List<(int X, int Y)> GetPixelsFromInsidePolygonAsArray(JsonElement geoJson, Bbox rasterBbox, int imgWidth, int imgHeight)
     {
-        if (rasterBbox == null) return Array.Empty<double[]>();
-
         var polygonPixels = GetPolygonPixels(geoJson, rasterBbox, imgWidth, imgHeight);
 
-        if (polygonPixels.Count == 0) return Array.Empty<double[]>();
+        if (polygonPixels.Length == 0) return Array.Empty<(int X, int Y)>();
 
       
-        float minX = polygonPixels.Min(p => p.X);
-        float maxX = polygonPixels.Max(p => p.X);
-        float minY = polygonPixels.Min(p => p.Y);
-        float maxY = polygonPixels.Max(p => p.Y);
+        float minX = MinValue;
+        float maxX = MaxValue;
+        float minY = MinValue;
+        float maxY = MaxValue;
 
-        var insidePoints = new List<double[]>();
+        foreach (var pixel in polygonPixels){
+            minX = Math.Min(minX, pixel.X);
+            maxX = Math.Max(maxX, pixel.X);
+            minY = Math.Min(minY, pixel.Y);
+            maxY = Math.Max(maxY, pixel.Y);
+        }
+
+        var insidePoints = new List<(int X, int Y)>(0);
 
         int startY = Math.Max(0, (int)minY);
         int endY = Math.Min(imgHeight - 1, (int)maxY);
@@ -128,20 +153,17 @@ public static class GeoUtils
             {
                 if (IsPointInPolygon(new PointF(x, y), polygonPixels))
                 {
-                    insidePoints.Add(new double[] { x, y });
+                    insidePoints.Add((x, y));
                 }
             }
         }
 
-        return insidePoints.ToArray();
+        return insidePoints;
     }
 
     #endregion
 
     #region Private Methods
-
-    // Wewnętrzna struktura pomocnicza
-    private struct GeoPoint { public double X; public double Y; }
 
     /// <summary>
     /// Parsuje strukturę GeoJSON i spłaszcza ją do listy wierzchołków.
@@ -149,78 +171,60 @@ public static class GeoUtils
     /// <remarks>
     /// Obsługuje: FeatureCollection, Feature, Polygon, MultiPolygon (tylko pierwszy wielokąt).
     /// </remarks>
-    private static List<GeoPoint> ExtractPointsFromGeoJson(string geojson)
+    private static bool TryGetExteriorRing(JsonElement geojson, out JsonElement ring)
     {
-        var points = new List<GeoPoint>();
-        if (string.IsNullOrWhiteSpace(geojson)) return points;
+        ring = default;
 
-        try
+        if (geojson.ValueKind != JsonValueKind.Object || !geojson.TryGetProperty("type", out var typeElement))
+            return false;
+
+        JsonElement geometry = geojson;
+
+        // Używamy ValueEquals - zero alokacji!
+        if (typeElement.ValueEquals("FeatureCollection"))
         {
-            using var doc = JsonDocument.Parse(geojson);
-            var root = doc.RootElement;
-            JsonElement geometry = root;
-
-            // 1. Obsługa FeatureCollection
-            if (root.TryGetProperty("type", out var type) && type.GetString() == "FeatureCollection")
-            {
-                if (root.TryGetProperty("features", out var features) && features.GetArrayLength() > 0)
-                {
-                    var firstFeature = features[0];
-                    if (!firstFeature.TryGetProperty("geometry", out geometry)) return points;
-                }
-                else return points;
-            }
-            // 2. Obsługa pojedynczego Feature
-            else if (type.GetString() == "Feature")
-            {
-                if (!root.TryGetProperty("geometry", out geometry)) return points;
-            }
-
-            // 3. Parsowanie właściwej geometrii
-            if (geometry.TryGetProperty("coordinates", out var coordsArray))
-            {
-                string geomType = geometry.GetProperty("type").GetString();
-
-                if (geomType == "Polygon" && coordsArray.GetArrayLength() > 0)
-                {
-                    var exteriorRing = coordsArray[0];
-                    ExtractCoordinates(exteriorRing, points);
-                }
-                else if (geomType == "MultiPolygon" && coordsArray.GetArrayLength() > 0)
-                {
-                    // Dla MultiPolygon bierzemy tylko pierwszy Polygon
-                    var firstPolygon = coordsArray[0];
-                    if (firstPolygon.GetArrayLength() > 0)
-                    {
-                        var exteriorRing = firstPolygon[0];
-                        ExtractCoordinates(exteriorRing, points);
-                    }
-                }
-            }
+            if (!geojson.TryGetProperty("features", out var features) || features.GetArrayLength() == 0)
+                return false;
+            
+            var firstFeature = features[0];
+            if (!firstFeature.TryGetProperty("geometry", out geometry))
+                return false;
+                
+            // Aktualizujemy typeElement dla geometrii
+            if (!geometry.TryGetProperty("type", out typeElement))
+                return false;
         }
-        catch (Exception ex)
+        else if (typeElement.ValueEquals("Feature"))
         {
-            Console.WriteLine($"[GeoUtils Error] Błąd parsowania GeoJSON: {ex.Message}");
+            if (!geojson.TryGetProperty("geometry", out geometry))
+                return false;
+                
+            // Aktualizujemy typeElement dla geometrii
+            if (!geometry.TryGetProperty("type", out typeElement))
+                return false;
         }
 
-        return points;
-    }
+        if (!geometry.TryGetProperty("coordinates", out var coords) || coords.ValueKind != JsonValueKind.Array)
+            return false;
 
-    /// <summary>
-    /// Funkcja wyłuskująca z obiektu JsonElement współrzędne wierzchołków wielokąta
-    /// </summary>
-    /// <param name="ring"></param>
-    /// <param name="points"></param>
-    private static void ExtractCoordinates(JsonElement ring, List<GeoPoint> points)
-    {
-        foreach (var pointJson in ring.EnumerateArray())
+        // Ponownie ValueEquals dla konkretnych typów geometrii
+        if (typeElement.ValueEquals("Polygon") && coords.GetArrayLength() > 0)
         {
-            points.Add(new GeoPoint
-            {
-                X = pointJson[0].GetDouble(),
-                Y = pointJson[1].GetDouble()
-            });
+            ring = coords[0];
+            return true;
         }
+        
+        if (typeElement.ValueEquals("MultiPolygon") && coords.GetArrayLength() > 0)
+        {
+            var firstPolygon = coords[0];
+            if (firstPolygon.GetArrayLength() > 0)
+            {
+                ring = firstPolygon[0];
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -228,16 +232,20 @@ public static class GeoUtils
     /// </summary>
     /// <param name="p">Sprawdzany punkt</param>
     /// <param name="polygon">Lista wierzchołków polygona</param>
-    private static bool IsPointInPolygon(PointF p, List<PointF> polygon)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsPointInPolygon(PointF p, ReadOnlySpan<PointF> polygon)
     {
         bool inside = false;
-        int j = polygon.Count - 1;
-        for (int i = 0; i < polygon.Count; i++)
+        int j = polygon.Length - 1;
+        for (int i = 0; i < polygon.Length; i++)
         {
+            var pi = polygon[i];
+            var pj = polygon[j];
+
             // Sprawdzenie przecięcia promienia z krawędzią wielokąta
-            if (polygon[i].Y < p.Y && polygon[j].Y >= p.Y || polygon[j].Y < p.Y && polygon[i].Y >= p.Y)
+            if (pi.Y < p.Y && pj.Y >= p.Y || pj.Y < p.Y && pi.Y >= p.Y)
             {
-                if (polygon[i].X + (p.Y - polygon[i].Y) / (polygon[j].Y - polygon[i].Y) * (polygon[j].X - polygon[i].X) < p.X)
+                if (pi.X + (p.Y - pi.Y) / (pj.Y - pi.Y) * (pj.X - pi.X) < p.X)
                 {
                     inside = !inside;
                 }

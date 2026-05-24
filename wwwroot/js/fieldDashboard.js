@@ -347,7 +347,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 indexMatrix: ndviData,
                 matrixWidth: STATE.indexWidth,
                 matrixHeight: STATE.indexHeight,
-                fieldBbox: STATE.fieldData.geojson,
+                fieldGeoJson: STATE.fieldData.geojson,
                 bbox: STATE.scanBboxCache,
                 analysisType: 'NDVI'
             });
@@ -379,7 +379,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 indexMatrix: ndviData,
                 matrixWidth: STATE.indexWidth,
                 matrixHeight: STATE.indexHeight,
-                fieldBbox: STATE.fieldData.geojson,
+                fieldGeoJson: STATE.fieldData.geojson,
                 bbox: STATE.scanBboxCache,
                 analysisType: 'GNDVI'
             });
@@ -411,7 +411,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 indexMatrix: ndviData,
                 matrixWidth: STATE.indexWidth,
                 matrixHeight: STATE.indexHeight,
-                fieldBbox: STATE.fieldData.geojson,
+                fieldGeoJson: STATE.fieldData.geojson,
                 bbox: STATE.scanBboxCache,
                 analysisType: 'SAVI'
             });
@@ -443,7 +443,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 indexMatrix: ndviData,
                 matrixWidth: STATE.indexWidth,
                 matrixHeight: STATE.indexHeight,
-                fieldBbox: STATE.fieldData.geojson,
+                fieldGeoJson: STATE.fieldData.geojson,
                 bbox: STATE.scanBboxCache,
                 analysisType: 'NDWI'
             });
@@ -475,7 +475,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 indexMatrix: ndviData,
                 matrixWidth: STATE.indexWidth,
                 matrixHeight: STATE.indexHeight,
-                fieldBbox: STATE.fieldData.geojson,
+                fieldGeoJson: STATE.fieldData.geojson,
                 bbox: STATE.scanBboxCache,
                 analysisType: 'EVI'
             });

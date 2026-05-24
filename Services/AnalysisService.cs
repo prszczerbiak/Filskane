@@ -206,9 +206,9 @@ public class AnalysisService
             ? PlotUtils.RenderNDWIHeatmap(indexArray, width, height)
             : PlotUtils.RenderVegetationHeatmap(indexArray, width, height);
 
-        if ((!string.IsNullOrEmpty(dto.FieldBbox)) && dto.Bbox != null)
+        if ((!string.IsNullOrEmpty(dto.FieldGeoJson)) && dto.Bbox != null)
         {
-            indexMap = ImageUtils.DrawGeoJsonPolygonOnImage(indexMap, dto.FieldBbox, dto.Bbox, true);
+            indexMap = ImageUtils.DrawGeoJsonPolygonOnImage(indexMap, dto.FieldGeoJson, dto.Bbox, true);
         }
         return indexMap;
     }
