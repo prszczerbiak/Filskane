@@ -6,7 +6,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <InvariantGlobalization>true</InvariantGlobalization>
     <PlatformTarget>x64</PlatformTarget>
+
+	 <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+	
 
   <ItemGroup>
     <Content Remove="wwwroot\css\colorbar.png" />
@@ -19,6 +22,7 @@
 
   <ItemGroup>
     <PackageReference Include="Isopoh.Cryptography.Argon2" Version="2.0.0" />
+<<<<<<< HEAD
     <PackageReference Include="MaxRev.Gdal.Core" Version="3.12.2.472" />
     <PackageReference Include="MaxRev.Gdal.WindowsRuntime.Minimal" Version="3.12.2.472" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.3" />
@@ -27,6 +31,12 @@
     <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.26.100" />
     <PackageReference Include="pythonnet" Version="3.0.5" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.12.40" />
+=======
+    <PackageReference Include="MaxRev.Gdal.Core" Version="3.11.4.376" />
+    <PackageReference Include="MaxRev.Gdal.WindowsRuntime.Minimal" Version="3.11.4.376" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.3" />
+    <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.7.0" />
+>>>>>>> ICIS-2026
     <PackageReference Include="ScottPlot" Version="5.1.57" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.7" />

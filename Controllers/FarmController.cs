@@ -153,6 +153,89 @@ public class FarmController : ControllerBase
     }
 
     /// <summary>
+    /// Pobiera pojazdy przypisane do użytkownika wraz z wygenerowanymi pozycjami na mapie.
+    /// </summary>
+    /// <returns>Lista pojazdów do wyświetlenia na mapie.</returns>
+    [HttpGet("getUserVehicles")]
+    public async Task<IActionResult> GetUserVehicles()
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        try
+        {
+            var vehicles = await _farmService.GetUserVehiclesAsync(username);
+            return Ok(vehicles);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd pobierania pojazdów dla {Username}", username);
+            return StatusCode(500, "Błąd serwera.");
+        }
+    }
+
+    /// <summary>
+    /// Dodaje nowy pojazd do konta aktualnego użytkownika.
+    /// </summary>
+    /// <param name="dto">Dane nowego pojazdu.</param>
+    /// <returns>ID dodanego pojazdu.</returns>
+    [HttpPost("saveVehicle")]
+    public async Task<IActionResult> SaveVehicle([FromBody] AddVehicleRequest dto)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        if (string.IsNullOrWhiteSpace(dto.VehicleName))
+            return BadRequest(new { error = "Nazwa pojazdu nie może być pusta." });
+
+        if (string.IsNullOrWhiteSpace(dto.IpAdress))
+            return BadRequest(new { error = "Adres IP nie może być pusty." });
+
+        if (!System.Net.IPAddress.TryParse(dto.IpAdress, out _))
+            return BadRequest(new { error = "Nieprawidłowy adres IP." });
+
+        if (dto.TcpPort is < 1 or > 65535)
+            return BadRequest(new { error = "Port TCP musi być z zakresu 1..65535." });
+
+        try
+        {
+            var vehicleId = await _farmService.AddVehicleAsync(username, dto);
+            _logger.LogInformation("Dodano nowy pojazd (ID: {VehicleId}) dla użytkownika {Username}", vehicleId, username);
+            return Ok(new { vehicleId });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd dodawania pojazdu dla {Username}", username);
+            return StatusCode(500, new { error = "Nie udało się zapisać pojazdu." });
+        }
+    }
+
+    /// <summary>
+    /// Usuwa pojazd przypisany do aktualnego użytkownika.
+    /// </summary>
+    [HttpDelete("deleteVehicle/{vehicleId}")]
+    public async Task<IActionResult> DeleteVehicle(int vehicleId)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        try
+        {
+            var deleted = await _farmService.DeleteVehicleAsync(username, vehicleId);
+            if (!deleted)
+                return NotFound(new { error = "Nie znaleziono pojazdu." });
+
+            _logger.LogInformation("Użytkownik {Username} usunął pojazd {VehicleId}", username, vehicleId);
+            return Ok(new { message = "Pojazd usunięty." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd usuwania pojazdu {VehicleId} dla {Username}", vehicleId, username);
+            return StatusCode(500, new { error = "Nie udało się usunąć pojazdu." });
+        }
+    }
+
+    /// <summary>
     /// Usuwa wybrane pole z systemu.
     /// </summary>
     /// <param name="fieldId">Identyfikator pola do usunięcia.</param>

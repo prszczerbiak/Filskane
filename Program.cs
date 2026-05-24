@@ -1,14 +1,56 @@
+using Filskane.DAL;
+using Filskane.Services;
+using MaxRev.Gdal.Core;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+<<<<<<< HEAD
 using System.Text;
 using Scalar.AspNetCore; // Nowoczesne UI
 using Filskane.DAL;
 using Filskane.Services;
+=======
+using Microsoft.OpenApi.Models;
+using OSGeo.GDAL;
+using System.Runtime.InteropServices;
+using System.Text;
+>>>>>>> ICIS-2026
 
 
 var builder = WebApplication.CreateBuilder(args);
 
+<<<<<<< HEAD
 // --- Us³ugi podstawowe ---
+=======
+var nativePath = Path.Combine(AppContext.BaseDirectory, "runtimes", "win-x64", "native");
+nativePath = Path.GetFullPath(nativePath);
+Console.WriteLine("Native path: " + nativePath);
+Console.WriteLine("Istnieje: " + Directory.Exists(nativePath));
+Environment.SetEnvironmentVariable("PATH", nativePath + ";" + Environment.GetEnvironmentVariable("PATH"));
+
+Console.WriteLine("BaseDirectory: " + AppContext.BaseDirectory);
+Console.WriteLine("CurrentDirectory: " + Directory.GetCurrentDirectory());
+
+var dlls = Directory.GetFiles(AppContext.BaseDirectory, "gdal_wrap.dll", SearchOption.AllDirectories);
+Console.WriteLine("gdal_wrap.dll znaleziony w: " + (dlls.Length > 0 ? dlls[0] : "BRAK!"));
+
+NativeLibrary.SetDllImportResolver(
+    typeof(OSGeo.GDAL.Gdal).Assembly,
+    (libraryName, assembly, searchPath) =>
+    {
+        var nativePath = Path.Combine(AppContext.BaseDirectory, "runtimes", "win-x64", "native");
+        var fullPath = Path.Combine(nativePath, libraryName + ".dll");
+        Console.WriteLine($"Szukam: {fullPath}, istnieje: {File.Exists(fullPath)}");
+        if (File.Exists(fullPath))
+            return NativeLibrary.Load(fullPath);
+        return IntPtr.Zero;
+    }
+);
+
+GdalBase.ConfigureAll();
+Gdal.AllRegister();
+
+// Podstawowe us³ugi frameworka ASP.NET Core
+>>>>>>> ICIS-2026
 builder.Services.AddControllers();
 
 // .NET 10 Native OpenAPI (Zamiast AddSwaggerGen)
@@ -24,6 +66,7 @@ builder.Services.AddScoped<FarmDAL>();
 builder.Services.AddScoped<FieldDAL>();
 builder.Services.AddScoped<ScanDAL>();
 builder.Services.AddScoped<SettingsDAL>();
+builder.Services.AddScoped<VehicleDAL>();
 
 // --- Warstwa Logiki Biznesowej (Services) ---
 builder.Services.AddScoped<AuthService>();
@@ -32,12 +75,19 @@ builder.Services.AddScoped<FieldService>();
 builder.Services.AddScoped<FieldsListService>();
 builder.Services.AddScoped<AnalysisService>();
 builder.Services.AddScoped<SettingsService>();
+builder.Services.AddSingleton<IoTService>();
 
 // --- Infrastruktura ---
 builder.Services.AddSingleton<IPasswordHasherService, Argon2PasswordHasherService>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddHttpClient();
+<<<<<<< HEAD
 builder.Services.AddSingleton<PythonService>();
+=======
+
+// Integracja z mikroserwisem Python przez HTTP.
+builder.Services.AddHttpClient<PythonService>();
+>>>>>>> ICIS-2026
 
 // --- Uwierzytelnianie (Bez zmian, to jest standard) ---
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

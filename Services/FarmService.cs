@@ -12,13 +12,17 @@ namespace Filskane.Services
     {
         private readonly FarmDAL _farmDal;
         private readonly FieldDAL _fieldDal;
+        private readonly VehicleDAL _vehicleDal;
         private readonly SettingsDAL _settingsDal;
         private readonly HttpClient _httpClient;
+        private const double DefaultFarmLatitude = 50.800667;
+        private const double DefaultFarmLongitude = 19.124278;
 
-        public FarmService(FarmDAL farmDal, FieldDAL fieldDal, SettingsDAL settingsDal, HttpClient httpClient)
+        public FarmService(FarmDAL farmDal, FieldDAL fieldDal, VehicleDAL vehicleDal, SettingsDAL settingsDal, HttpClient httpClient)
         {
             _farmDal = farmDal;
             _fieldDal = fieldDal;
+            _vehicleDal = vehicleDal;
             _settingsDal = settingsDal;
             _httpClient = httpClient;
         }
@@ -63,6 +67,56 @@ namespace Filskane.Services
         public async Task<List<FieldShortDto>> GetUserFieldsAsync(string username)
         {
             return await _fieldDal.GetUserFieldsAsync(username);
+        }
+
+        /// <summary>
+        /// Pobiera pojazdy przypisane do użytkownika i nadaje im pozycje na mapie wokół gospodarstwa.
+        /// </summary>
+        /// <param name="username">Nazwa użytkownika.</param>
+        /// <returns>Lista pojazdów z wygenerowanymi pozycjami mapowymi.</returns>
+        public async Task<List<VehicleMapDto>> GetUserVehiclesAsync(string username)
+        {
+            var farmInfo = await _settingsDal.GetLongInfoAsync(username);
+            var vehicles = await _vehicleDal.GetUserVehiclesAsync(username);
+
+            if (vehicles.Count == 0)
+                return [];
+
+            double baseLat = farmInfo?.FarmY ?? DefaultFarmLatitude;
+            double baseLng = farmInfo?.FarmX ?? DefaultFarmLongitude;
+
+            return GenerateVehicleMapPositions(baseLat, baseLng, vehicles);
+        }
+
+        /// <summary>
+        /// Dodaje nowy pojazd dla użytkownika.
+        /// </summary>
+        /// <param name="username">Nazwa użytkownika.</param>
+        /// <param name="dto">Dane pojazdu.</param>
+        /// <returns>ID nowo dodanego pojazdu.</returns>
+        public async Task<int> AddVehicleAsync(string username, AddVehicleRequest dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.VehicleName))
+                throw new ArgumentException("Nazwa pojazdu nie może być pusta.", nameof(dto.VehicleName));
+
+            if (string.IsNullOrWhiteSpace(dto.IpAdress))
+                throw new ArgumentException("Adres IP pojazdu nie może być pusty.", nameof(dto.IpAdress));
+
+            if (dto.TcpPort is < 1 or > 65535)
+                throw new ArgumentOutOfRangeException(nameof(dto.TcpPort), "Port TCP musi mieścić się w zakresie 1..65535.");
+
+            return await _vehicleDal.AddVehicleAsync(username, dto.VehicleName.Trim(), dto.IpAdress.Trim(), dto.TcpPort);
+        }
+
+        /// <summary>
+        /// Usuwa pojazd należący do użytkownika.
+        /// </summary>
+        public async Task<bool> DeleteVehicleAsync(string username, int vehicleId)
+        {
+            if (vehicleId <= 0)
+                throw new ArgumentOutOfRangeException(nameof(vehicleId), "ID pojazdu musi być większe od zera.");
+
+            return await _vehicleDal.DeleteVehicleAsync(username, vehicleId);
         }
 
         /// <summary>
@@ -162,6 +216,34 @@ namespace Filskane.Services
             {
                 return ("Brak danych", "Błąd API", "");
             }
+        }
+
+        private static List<VehicleMapDto> GenerateVehicleMapPositions(
+            double baseLat,
+            double baseLng,
+            IReadOnlyList<VehicleBaseDto> vehicles)
+        {
+            var result = new List<VehicleMapDto>(vehicles.Count);
+            if (vehicles.Count == 0) return result;
+
+            const double baseRadiusMeters = 18.0;
+            const double radiusStepMeters = 7.0;
+            double latitudeScale = 111_000.0;
+            double longitudeScale = 111_000.0 * Math.Max(Math.Cos(baseLat * Math.PI / 180.0), 0.1);
+
+            for (int i = 0; i < vehicles.Count; i++)
+            {
+                var vehicle = vehicles[i];
+                double angle = (2.0 * Math.PI * i) / vehicles.Count;
+                double radiusMeters = baseRadiusMeters + (i / 8) * radiusStepMeters;
+
+                double lat = baseLat + (Math.Sin(angle) * radiusMeters / latitudeScale);
+                double lng = baseLng + (Math.Cos(angle) * radiusMeters / longitudeScale);
+
+                result.Add(new VehicleMapDto(vehicle.Id, vehicle.Name, vehicle.IpAdress, vehicle.TcpPort, lat, lng));
+            }
+
+            return result;
         }
     }
 }

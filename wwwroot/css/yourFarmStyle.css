@@ -211,6 +211,26 @@ button {
         outline: none;
     }
 
+#vehicleNameInput,
+#vehicleIpInput,
+#vehiclePortInput {
+    width: 50%;
+    padding: 10px 12px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    margin: 8px 0;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+    #vehicleNameInput:focus,
+    #vehicleIpInput:focus,
+    #vehiclePortInput:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+        outline: none;
+    }
+
 /* =========================================
    6. LEAFLET CUSTOMIZATIONS
    ========================================= */
@@ -238,6 +258,31 @@ button {
 
     .add-field-btn:hover {
         background-color: var(--primary-hover);
+    }
+
+.add-vehicle-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background-color: var(--success-color);
+    color: white;
+    font-weight: bold;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+    .add-vehicle-btn .plus-icon {
+        font-size: 18px;
+        font-weight: bold;
+        color: white;
+    }
+
+    .add-vehicle-btn:hover {
+        background-color: var(--success-hover);
     }
 
 /* Geocoder (Wyszukiwarka) */

@@ -13,7 +13,7 @@ public static class NdviClassifier
     /// <param name="minThreshold">Górna granica poziomu zadowalającego (żółtego) NDVI</param>
     /// <param name="maxThreshold">Dolna granica poziomu zadowalającego (żółtego) NDVI</param>
     /// <returns>Tablica trzech możliwych klas (0 - zdrowy, 1 - zadowalający, 2 - alarmujący) dla każdego punktu z fieldPoints</returns>
-    public static int[] ClassifyPoints(double[][] fieldPoints, double[,] ndviMatrix, double minThreshold, double maxThreshold)
+    public static int[] ClassifyPoints(double[][] fieldPoints, ReadOnlySpan<double> ndviArray, int width, double minThreshold, double maxThreshold)
     {
         int[] labels = new int[fieldPoints.Length];
 
@@ -22,7 +22,7 @@ public static class NdviClassifier
             int x = (int)fieldPoints[i][0];
             int y = (int)fieldPoints[i][1];
 
-            double value = ndviMatrix[y, x];
+            double value = ndviArray[y * width + x];
 
             if (value >= maxThreshold)
             {

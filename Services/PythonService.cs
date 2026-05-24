@@ -1,73 +1,123 @@
-﻿using Python.Runtime;
+﻿using System.Net.Http.Json;
 using System.Text.Json;
 using Filskane.Models;
 
 namespace Filskane.Services;
 
 /// <summary>
-/// Serwis integrujący aplikację .NET z silnikiem Python (Python.NET).
-/// Odpowiada za inicjalizację środowiska oraz wywoływanie skryptów analitycznych (DBSCAN).
+/// Klient HTTP do mikroserwisu Python odpowiedzialnego za analizy numeryczne.
 /// </summary>
 public class PythonService
 {
-    private static bool _initialized = false;
-    private static readonly object _lock = new object();
-
+    private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
-    private readonly string _scriptPath;
+    private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
 
-    public PythonService(IConfiguration configuration)
+    private static double[][] ToJaggedMatrix(double[] values, int matrixWidth, int matrixHeight, string name)
     {
-        _configuration = configuration;
+        if (matrixWidth <= 0 || matrixHeight <= 0)
+        {
+            throw new ArgumentOutOfRangeException(name, "Wymiary macierzy muszą być większe od zera.");
+        }
 
-        string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-        string projectDir = Path.GetFullPath(Path.Combine(baseDir, @"..\..\.."));
-        _scriptPath = Path.Combine(projectDir, "PythonCluster");
+        var expectedSize = matrixWidth * matrixHeight;
+        if (values.Length != expectedSize)
+        {
+            throw new InvalidOperationException(
+                $"Tablica '{name}' ma {values.Length} elementów, ale oczekiwano {expectedSize} dla macierzy {matrixWidth}x{matrixHeight}.");
+        }
 
-        InitializePython();
+        var matrix = new double[matrixHeight][];
+        for (var row = 0; row < matrixHeight; row++)
+        {
+            var offset = row * matrixWidth;
+            var rowValues = new double[matrixWidth];
+            Array.Copy(values, offset, rowValues, 0, matrixWidth);
+            matrix[row] = rowValues;
+        }
+
+        return matrix;
     }
 
-    /// <summary>
-    /// Konfiguruje i uruchamia silnik Python.NET.
-    /// Ustawia zmienne środowiskowe PYTHONHOME oraz PYTHONPATH.
-    /// </summary>
-    /// <exception cref="FileNotFoundException">Rzucany, gdy nie znaleziono biblioteki python311.dll.</exception>
-    /// <exception cref="InvalidOperationException">Rzucany w przypadku błędu inicjalizacji silnika.</exception>
-    private void InitializePython()
+    public PythonService(HttpClient httpClient, IConfiguration configuration)
     {
-        if (_initialized) return;
-        lock (_lock)
+        _httpClient = httpClient;
+        _configuration = configuration;
+
+        var baseUrl = _configuration["PythonService:BaseUrl"]
+            ?? throw new InvalidOperationException("Brak konfiguracji 'PythonService:BaseUrl' w appsettings.json");
+        _httpClient.BaseAddress = new Uri(baseUrl);
+        _httpClient.Timeout = TimeSpan.FromSeconds(_configuration.GetValue("PythonService:TimeoutSeconds", 120));
+    }
+
+    public MultiIndexGroupingResultDto RunMultiIndexGrouping(
+        double[] ndvi,
+        double[] gndvi,
+        double[] ndwi,
+        int matrixWidth,
+        int matrixHeight,
+        double[][] fieldPoints,
+        double ndviMin,
+        double ndviMax,
+        double gndviMin,
+        double gndviMax,
+        double ndwiMin,
+        double ndwiMax)
+    {
+        double eps = _configuration.GetValue<double>("AlgorithmSettings:Eps", 2.0);
+        int minSamples = _configuration.GetValue<int>("AlgorithmSettings:MinSamples", 3);
+
+        try
         {
-            if (_initialized) return;
+            var ndviMatrix = ToJaggedMatrix(ndvi, matrixWidth, matrixHeight, nameof(ndvi));
+            var gndviMatrix = ToJaggedMatrix(gndvi, matrixWidth, matrixHeight, nameof(gndvi));
+            var ndwiMatrix = ToJaggedMatrix(ndwi, matrixWidth, matrixHeight, nameof(ndwi));
 
-            try
+            var payload = new
             {
-                string pythonHome = _configuration["Python:Path"]
-                                    ?? throw new InvalidOperationException("Brak konfiguracji 'Python:Path' w appsettings.json");
+                ndvi = ndviMatrix,
+                gndvi = gndviMatrix,
+                ndwi = ndwiMatrix,
+                matrix_width = matrixWidth,
+                matrix_height = matrixHeight,
+                field_points = fieldPoints,
+                thresholds = new
+                {
+                    ndvi = new { min = ndviMin, max = ndviMax },
+                    gndvi = new { min = gndviMin, max = gndviMax },
+                    ndwi = new { min = ndwiMin, max = ndwiMax }
+                },
+                eps,
+                min_samples = minSamples,
+                ellipse_h = 3,
+                ellipse_w = 4
+            };
 
-                string dllPath = Path.Combine(pythonHome, "python311.dll");
+            var response = _httpClient.PostAsJsonAsync("multi-index-grouping", payload, _jsonOptions)
+                .GetAwaiter()
+                .GetResult();
 
-                if (!File.Exists(dllPath))
-                    throw new FileNotFoundException($"Nie znaleziono biblioteki Python pod adresem: {dllPath}.");
-
-                Runtime.PythonDLL = dllPath;
-                PythonEngine.PythonHome = pythonHome;
-
-                PythonEngine.PythonPath = string.Join(";",
-                    Path.Combine(pythonHome, "Lib"),
-                    Path.Combine(pythonHome, "Lib", "site-packages"),
-                    Path.Combine(pythonHome, "DLLs"),
-                    _scriptPath
-                );
-
-                PythonEngine.Initialize();
-                PythonEngine.BeginAllowThreads();
-                _initialized = true;
-            }
-            catch (Exception ex)
+            if (!response.IsSuccessStatusCode)
             {
-                throw new InvalidOperationException($"Błąd inicjalizacji Pythona: {ex.Message}", ex);
+                var errorBody = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                throw new InvalidOperationException(
+                    $"Python API zwróciło {(int)response.StatusCode} ({response.ReasonPhrase}). {errorBody}");
             }
+
+            var result = response.Content.ReadFromJsonAsync<MultiIndexGroupingResultDto>(_jsonOptions)
+                .GetAwaiter()
+                .GetResult();
+
+            return result ?? new MultiIndexGroupingResultDto(
+                Array.Empty<int[]>(),
+                Array.Empty<int>(),
+                new Dictionary<string, double>(),
+                Array.Empty<int[]>()
+            );
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Błąd wykonania grupowania wielowskaźnikowego w mikroserwisie Python: {ex.Message}", ex);
         }
     }
 
@@ -89,38 +139,35 @@ public class PythonService
         double eps = _configuration.GetValue<double>("AlgorithmSettings:Eps", 2.0);
         int minSamples = _configuration.GetValue<int>("AlgorithmSettings:MinSamples", 3);
 
-        using (Py.GIL())
+        try
         {
-            try
+            var payload = new
             {
-                dynamic sys = Py.Import("sys");
-                dynamic path = sys.path;
-                path.append(_scriptPath);
+                points,
+                ndvi_values = ndviValues,
+                eps,
+                min_samples = minSamples,
+                ellipse_h = 3,
+                ellipse_w = 4
+            };
 
-                dynamic module = Py.Import("ndvi_entry");
+            var response = _httpClient.PostAsJsonAsync("dbscan", payload, _jsonOptions)
+                .GetAwaiter()
+                .GetResult();
+            response.EnsureSuccessStatusCode();
 
-                string payload = JsonSerializer.Serialize(new
-                {
-                    points,
-                    ndvi_values = ndviValues,
-                    eps,
-                    min_samples = minSamples,
-                    ellipse_h = 3,
-                    ellipse_w = 4
-                });
+            var result = response.Content.ReadFromJsonAsync<DbscanResultDto>(_jsonOptions)
+                .GetAwaiter()
+                .GetResult();
 
-                string resultJson = module.ndvi_cluster(payload);
-                var result = JsonSerializer.Deserialize<DbscanResultDto>(resultJson);
-
-                return (
-                    result?.ClusterIds ?? Array.Empty<int>(),
-                    result?.NdviMeans ?? new Dictionary<string, double>()
-                );
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException($"Błąd wykonania skryptu Python: {ex.Message}", ex);
-            }
+            return (
+                result?.ClusterIds ?? Array.Empty<int>(),
+                result?.NdviMeans ?? new Dictionary<string, double>()
+            );
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Błąd wykonania analizy DBSCAN w mikroserwisie Python: {ex.Message}", ex);
         }
     }
 }

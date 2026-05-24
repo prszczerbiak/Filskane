@@ -45,4 +45,48 @@
     /// <param name="Id">Identyfikator pola.</param>
     /// <param name="Name">Nazwa pola.</param>
     public record FieldListItemDto(int Id, string Name);
+
+    /// <summary>
+    /// Surowy rekord pojazdu zapisany w bazie danych.
+    /// </summary>
+    /// <param name="Id">Identyfikator pojazdu.</param>
+    /// <param name="Name">Nazwa pojazdu.</param>
+    /// <param name="IpAdress">Adres IP pojazdu.</param>
+    /// <param name="TcpPort">Port TCP pojazdu.</param>
+    public record VehicleBaseDto(
+        int Id,
+        string Name,
+        string? IpAdress,
+        int? TcpPort
+    );
+
+    /// <summary>
+    /// Pojazd z wygenerowaną pozycją na mapie.
+    /// </summary>
+    /// <param name="Id">Identyfikator pojazdu.</param>
+    /// <param name="Name">Nazwa pojazdu.</param>
+    /// <param name="IpAdress">Adres IP pojazdu.</param>
+    /// <param name="TcpPort">Port TCP pojazdu.</param>
+    /// <param name="Lat">Szerokość geograficzna markeru.</param>
+    /// <param name="Lng">Długość geograficzna markeru.</param>
+    public record VehicleMapDto(
+        int Id,
+        string Name,
+        string? IpAdress,
+        int? TcpPort,
+        double Lat,
+        double Lng
+    );
+
+    /// <summary>
+    /// Żądanie dodania nowego pojazdu do bazy.
+    /// </summary>
+    /// <param name="VehicleName">Nazwa pojazdu.</param>
+    /// <param name="IpAdress">Adres IP pojazdu.</param>
+    /// <param name="TcpPort">Port TCP pojazdu.</param>
+    public record AddVehicleRequest(
+        string VehicleName,
+        string IpAdress,
+        int TcpPort
+    );
 }

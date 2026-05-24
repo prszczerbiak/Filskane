@@ -35,7 +35,20 @@
                     <button id="importBtn" class="btn-primary"><i class="fa-solid fa-cloud-arrow-up"></i> Importuj Skan</button>
                     <input type="file" id="tiffInput" accept=".zip,application/zip" style="display:none">
 
-                    <button id="ndviBtn" class="btn-success"><i class="fa-solid fa-leaf"></i> Analiza NDVI</button>
+                    <div class="dropdown" style="position: relative; display: inline-block;">
+                        <button id="analysisBtn" class="btn-success">
+                            <i class="fa-solid fa-leaf"></i> Analiza <i class="fa-solid fa-caret-down"></i>
+                        </button>
+                        <div id="analysisDropdown" class="dropdown-content" style="display: none; position: absolute; z-index: 10; background: white; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-radius: 4px; padding: 5px; min-width: 150px; flex-direction: column; gap: 5px;">
+                            <button class="btn-action" data-analysis="NDVI">NDVI</button>
+                            <button class="btn-action" data-analysis="GNDVI">GNDVI</button>
+                            <button class="btn-action" data-analysis="SAVI">SAVI</button>
+                            <button class="btn-action" data-analysis="NDWI">NDWI</button>
+                            <button class="btn-action" data-analysis="EVI">EVI</button>
+                            <button type="button" class="btn-overall-analysis">Całościowa analiza</button>
+                        </div>
+                    </div>
+
                     <button id="historyBtn" class="btn-info"><i class="fa-solid fa-clock-rotate-left"></i> Historia</button>
                 </div>
 
@@ -170,6 +183,33 @@
             <h3>Podgląd RGB</h3>
             <div class="nvdiPicture">
                 <img id="rgbImage" alt="Obraz RGB">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-close">Zamknij</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="overallAnalysisModal" class="modal">
+        <div class="nvdiModal-content">
+            <h3>Całościowa analiza</h3>
+            <div class="nvdiPicture">
+                <div id="overallAnalysisLoader" class="loader">Ładowanie...</div>
+                <img id="overallAnalysisImage" alt="Obraz RGB" style="display:none;" />
+                <div id="overallAnalysisNoData" style="display:none; text-align:center;">
+                    <p>Brak danych do analizy.</p>
+                </div>
+                <div id="overallAnalysisLegend" class="overall-legend" style="display:none;">
+                    <h4>Legenda nakładki</h4>
+                    <div class="overall-legend-grid">
+                        <div class="overall-legend-item"><span class="legend-swatch legend-good"></span><span>Dobry stan</span></div>
+                        <div class="overall-legend-item"><span class="legend-swatch legend-mid"></span><span>Zadowalający</span></div>
+                        <div class="overall-legend-item"><span class="legend-swatch legend-ndvi"></span><span>Zagrożenie NDVI</span></div>
+                        <div class="overall-legend-item"><span class="legend-swatch legend-gndvi"></span><span>Zagrożenie GNDVI</span></div>
+                        <div class="overall-legend-item"><span class="legend-swatch legend-ndwi"></span><span>Zagrożenie NDWI</span></div>
+                        <div class="overall-legend-item"><span class="legend-swatch legend-combined"></span><span>Zagrożenie NDWI + GNDVI</span></div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn-close">Zamknij</button>

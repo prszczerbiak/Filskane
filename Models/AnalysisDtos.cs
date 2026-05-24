@@ -61,7 +61,9 @@ namespace Filskane.Models
     /// Zawiera surowe dane numeryczne NDVI w formie macierzy oraz BBox pola.
     /// </summary>
     public record NdviDataDto(
-        List<List<double>> Ndvi,
+        double[] Ndvi,
+        int MatrixWidth,
+        int MatrixHeight,
         Bbox? FieldBbox
     );
 
@@ -85,13 +87,16 @@ namespace Filskane.Models
     /// <summary>
     /// Dane wejściowe do wygenerowania wizualizacji graficznej (PNG) indeksu NDVI.
     /// </summary>
-    /// <param name="NdviMatrix">Macierz wartości NDVI.</param>
+    /// <param name="IndexMatrix">Macierz wartości NDVI.</param>
     /// <param name="FieldBbox">Opcjonalne granice pola w formacie string.</param>
     /// <param name="Bbox">Opcjonalne granice obrazu.</param>
-    public record NdviVisualizationDto(
-        List<List<double>> NdviMatrix,
+    public record IndexVisualizationDto(
+        double[] IndexMatrix,
+        int MatrixWidth,
+        int MatrixHeight,
         string? FieldBbox,
-        Bbox? Bbox
+        Bbox? Bbox,
+        string? AnalysisType = null
     );
 
     /// <summary>
@@ -112,13 +117,24 @@ namespace Filskane.Models
         [property: JsonPropertyName("ndvi_means")] Dictionary<string, double> NdviMeans
     );
 
+    public record MultiIndexGroupingResultDto(
+        [property: JsonPropertyName("combined_classes")] int[][] CombinedClasses,
+        [property: JsonPropertyName("cluster_ids")] int[] ClusterIds,
+        [property: JsonPropertyName("cluster_means")] Dictionary<string, double> ClusterMeans,
+        [property: JsonPropertyName("cluster_points")] int[][] ClusterPoints
+    );
+
     /// <summary>
     /// Parametry żądania o pogrupowanie (klasteryzację) danych NDVI.
     /// </summary>
     public record NdviGroupRequestDto
     {
+        public int PlantId { get; init; }
         public int CycleId { get; init; }
-        public List<List<double>> Ndvi { get; init; } = [];
+        public double[] VegetationIndex { get; init; } = [];
+        public int MatrixWidth { get; init; }
+        public int MatrixHeight { get; init; }
+        public string AnalysisType { get; init; } = "NDVI";
         public string? FieldGeojson { get; init; }
         public Bbox? ImageBbox { get; init; }
         public bool DarkMode { get; init; } = false;
