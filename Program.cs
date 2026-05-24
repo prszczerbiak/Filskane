@@ -3,24 +3,16 @@ using Filskane.Services;
 using MaxRev.Gdal.Core;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-<<<<<<< HEAD
 using System.Text;
 using Scalar.AspNetCore; // Nowoczesne UI
-using Filskane.DAL;
-using Filskane.Services;
-=======
 using Microsoft.OpenApi.Models;
 using OSGeo.GDAL;
 using System.Runtime.InteropServices;
-using System.Text;
->>>>>>> ICIS-2026
 
 
 var builder = WebApplication.CreateBuilder(args);
 
-<<<<<<< HEAD
 // --- Us³ugi podstawowe ---
-=======
 var nativePath = Path.Combine(AppContext.BaseDirectory, "runtimes", "win-x64", "native");
 nativePath = Path.GetFullPath(nativePath);
 Console.WriteLine("Native path: " + nativePath);
@@ -50,7 +42,6 @@ GdalBase.ConfigureAll();
 Gdal.AllRegister();
 
 // Podstawowe us³ugi frameworka ASP.NET Core
->>>>>>> ICIS-2026
 builder.Services.AddControllers();
 
 // .NET 10 Native OpenAPI (Zamiast AddSwaggerGen)
@@ -81,13 +72,10 @@ builder.Services.AddSingleton<IoTService>();
 builder.Services.AddSingleton<IPasswordHasherService, Argon2PasswordHasherService>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddHttpClient();
-<<<<<<< HEAD
 builder.Services.AddSingleton<PythonService>();
-=======
 
 // Integracja z mikroserwisem Python przez HTTP.
 builder.Services.AddHttpClient<PythonService>();
->>>>>>> ICIS-2026
 
 // --- Uwierzytelnianie (Bez zmian, to jest standard) ---
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
