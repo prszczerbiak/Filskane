@@ -58,6 +58,11 @@ Warstwa prezentacji danych mapowych w przeglądarce.
     ```bash
     docker compose up --build python-service
     ```
+    - Symulator maszyny (TCP):
+      ```bash
+      docker compose up --build machine-simulator
+      ```
+      Symulator nasłuchuje na porcie `8001` i wysyła kolejne pozycje jako linie JSON przez TCP.
 
 3.  **Konfiguracja Backend:**
     W pliku `appsettings.json` uzupełnij `ConnectionString` do bazy Oracle.

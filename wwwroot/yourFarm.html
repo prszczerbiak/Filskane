@@ -61,6 +61,31 @@
         </div>
     </div>
 
+    <div id="addVehicleModal" class="modal">
+        <div class="transparentModalContent">
+            <h3>Dodaj nowy pojazd:</h3>
+            <div class="vehicle-form-fields">
+                <input type="text" id="vehicleNameInput" placeholder="Nazwa pojazdu" />
+                <input type="text" id="vehicleIpInput" placeholder="Adres IP" />
+                <input type="number" id="vehiclePortInput" placeholder="TCP port" min="1" max="65535" />
+            </div>
+            <button id="cancelAddVehicleBtn" class="btn-danger">Anuluj</button>
+            <button id="addVehicleBtn" class="btn-success">Zatwierdź</button>
+        </div>
+    </div>
+
+    <div id="deleteVehicleModal" class="modal">
+        <div class="modalContent">
+            <p>
+                Czy na pewno chcesz usunąć ten pojazd?
+            </p>
+            <div class="modalActions">
+                <button id="cancelDeleteVehicleBtn" class="btn-cancel">Anuluj</button>
+                <button id="confirmDeleteVehicleBtn" class="btn-danger">Usuń</button>
+            </div>
+        </div>
+    </div>
+
     <div id="deleteFarmModal" class="modal">
         <div class="modalContent">
             <p>

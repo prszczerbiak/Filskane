@@ -26,6 +26,21 @@ public class FieldController : ControllerBase
 
     private string GetCurrentUsername() => User.Identity?.Name ?? string.Empty;
 
+    private IActionResult OkIndexData((NdviDataDto? Data, DateTime? Date) result)
+    {
+        if (result.Data == null)
+            return NoContent();
+
+        Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
+        return Ok(new
+        {
+            ndvi = result.Data.Ndvi,
+            matrixWidth = result.Data.MatrixWidth,
+            matrixHeight = result.Data.MatrixHeight,
+            fieldBbox = result.Data.FieldBbox
+        });
+    }
+
     /// <summary>
     /// Pobiera szczegółowe informacje o wybranym polu.
     /// </summary>
@@ -285,10 +300,7 @@ public class FieldController : ControllerBase
         try
         {
             var result = await _analysisService.GetNdviDataAsync(username, fieldId, null);
-            if (result.Data == null) return NoContent();
-
-            Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
-            return Ok(result.Data);
+            return OkIndexData(result);
         }
         catch (Exception ex)
         {
@@ -311,11 +323,7 @@ public class FieldController : ControllerBase
         try
         {
             var result = await _analysisService.GetNdviDataAsync(username, 0, scanId);
-
-            if (result.Data == null) return NoContent();
-
-            Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
-            return Ok(result.Data);
+            return OkIndexData(result);
         }
         catch (Exception ex)
         {
@@ -333,10 +341,7 @@ public class FieldController : ControllerBase
         try
         {
             var result = await _analysisService.GetGndviDataAsync(username, fieldId, null);
-            if (result.Data == null) return NoContent();
-
-            Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
-            return Ok(result.Data);
+            return OkIndexData(result);
         }
         catch (Exception ex)
         {
@@ -354,10 +359,7 @@ public class FieldController : ControllerBase
         try
         {
             var result = await _analysisService.GetGndviDataAsync(username, 0, scanId);
-            if (result.Data == null) return NoContent();
-
-            Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
-            return Ok(result.Data);
+            return OkIndexData(result);
         }
         catch (Exception ex)
         {
@@ -375,10 +377,7 @@ public class FieldController : ControllerBase
         try
         {
             var result = await _analysisService.GetSaviDataAsync(username, fieldId, null);
-            if (result.Data == null) return NoContent();
-
-            Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
-            return Ok(result.Data);
+            return OkIndexData(result);
         }
         catch (Exception ex)
         {
@@ -396,10 +395,7 @@ public class FieldController : ControllerBase
         try
         {
             var result = await _analysisService.GetSaviDataAsync(username, 0, scanId);
-            if (result.Data == null) return NoContent();
-
-            Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
-            return Ok(result.Data);
+            return OkIndexData(result);
         }
         catch (Exception ex)
         {
@@ -417,10 +413,7 @@ public class FieldController : ControllerBase
         try
         {
             var result = await _analysisService.GetNdwiDataAsync(username, fieldId, null);
-            if (result.Data == null) return NoContent();
-
-            Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
-            return Ok(result.Data);
+            return OkIndexData(result);
         }
         catch (Exception ex)
         {
@@ -438,10 +431,7 @@ public class FieldController : ControllerBase
         try
         {
             var result = await _analysisService.GetNdwiDataAsync(username, 0, scanId);
-            if (result.Data == null) return NoContent();
-
-            Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
-            return Ok(result.Data);
+            return OkIndexData(result);
         }
         catch (Exception ex)
         {
@@ -459,10 +449,7 @@ public class FieldController : ControllerBase
         try
         {
             var result = await _analysisService.GetEviDataAsync(username, fieldId, null);
-            if (result.Data == null) return NoContent();
-
-            Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
-            return Ok(result.Data);
+            return OkIndexData(result);
         }
         catch (Exception ex)
         {
@@ -480,10 +467,7 @@ public class FieldController : ControllerBase
         try
         {
             var result = await _analysisService.GetEviDataAsync(username, 0, scanId);
-            if (result.Data == null) return NoContent();
-
-            Response.Headers.Append("X-Scan-Date", result.Date?.ToString("yyyy-MM-dd"));
-            return Ok(result.Data);
+            return OkIndexData(result);
         }
         catch (Exception ex)
         {
@@ -500,12 +484,21 @@ public class FieldController : ControllerBase
     [HttpPost("visualize")]
     public IActionResult VisualizeNDVI([FromBody] IndexVisualizationDto request)
     {
+        if (request.IndexMatrix == null || request.IndexMatrix.Length == 0)
+            return BadRequest("Brak danych NDVI");
+
+        if (!TryNormalizeIndexDimensions(request.IndexMatrix, request.MatrixWidth, request.MatrixHeight, out var width, out var height, out var validationError))
+            return BadRequest(validationError);
+
         try
         {
-            if (request.IndexMatrix == null || request.IndexMatrix.Count == 0)
-                return BadRequest("Brak danych NDVI");
+            var normalizedRequest = request with
+            {
+                MatrixWidth = width,
+                MatrixHeight = height
+            };
 
-            var imageBytes = _analysisService.RenderIndexVisualization(request);
+            var imageBytes = _analysisService.RenderIndexVisualization(normalizedRequest);
             return File(imageBytes, "image/png");
         }
         catch (Exception ex)
@@ -513,6 +506,53 @@ public class FieldController : ControllerBase
             _logger.LogError(ex, "Błąd renderowania wizualizacji NDVI");
             return BadRequest(new { error = ex.Message });
         }
+    }
+
+    private static bool TryNormalizeIndexDimensions(double[] indexMatrix, int matrixWidth, int matrixHeight, out int width, out int height, out string error)
+    {
+        width = matrixWidth;
+        height = matrixHeight;
+        error = string.Empty;
+
+        if (width > 0 && height > 0)
+        {
+            if (indexMatrix.Length != width * height)
+            {
+                error = "Długość macierzy NDVI nie odpowiada podanym wymiarom.";
+                return false;
+            }
+
+            return true;
+        }
+
+        if (width <= 0 && height <= 0)
+        {
+            var square = (int)Math.Sqrt(indexMatrix.Length);
+            if (square > 0 && square * square == indexMatrix.Length)
+            {
+                width = square;
+                height = square;
+                return true;
+            }
+
+            error = "Brak poprawnych wymiarów macierzy NDVI.";
+            return false;
+        }
+
+        if (width <= 0 && height > 0 && indexMatrix.Length % height == 0)
+        {
+            width = indexMatrix.Length / height;
+            return true;
+        }
+
+        if (height <= 0 && width > 0 && indexMatrix.Length % width == 0)
+        {
+            height = indexMatrix.Length / width;
+            return true;
+        }
+
+        error = "Długość macierzy NDVI nie odpowiada podanym wymiarom.";
+        return false;
     }
 
     /// <summary>

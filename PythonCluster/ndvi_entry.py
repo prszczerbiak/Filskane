@@ -138,10 +138,22 @@ def multi_index_grouping(input_json: str) -> str:
     try:
         data = json.loads(input_json)
 
+        matrix_width = int(data.get("matrix_width", 0))
+        matrix_height = int(data.get("matrix_height", 0))
+
         ndvi = np.array(data["ndvi"], dtype=np.float64)
         gndvi = np.array(data["gndvi"], dtype=np.float64)
         ndwi = np.array(data["ndwi"], dtype=np.float64)
         field_points = np.array(data.get("field_points", []), dtype=np.int32)
+
+        if matrix_width > 0 and matrix_height > 0:
+            expected_size = matrix_width * matrix_height
+            if ndvi.size != expected_size or gndvi.size != expected_size or ndwi.size != expected_size:
+                raise ValueError("Macierze NDVI/GNDVI/NDWI muszą mieć zgodny rozmiar z matrix_width i matrix_height")
+
+            ndvi = ndvi.reshape((matrix_height, matrix_width))
+            gndvi = gndvi.reshape((matrix_height, matrix_width))
+            ndwi = ndwi.reshape((matrix_height, matrix_width))
 
         if ndvi.shape != gndvi.shape or ndvi.shape != ndwi.shape:
             raise ValueError("Macierze NDVI/GNDVI/NDWI muszą mieć te same wymiary")

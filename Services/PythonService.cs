@@ -13,6 +13,32 @@ public class PythonService
     private readonly IConfiguration _configuration;
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
 
+    private static double[][] ToJaggedMatrix(double[] values, int matrixWidth, int matrixHeight, string name)
+    {
+        if (matrixWidth <= 0 || matrixHeight <= 0)
+        {
+            throw new ArgumentOutOfRangeException(name, "Wymiary macierzy muszą być większe od zera.");
+        }
+
+        var expectedSize = matrixWidth * matrixHeight;
+        if (values.Length != expectedSize)
+        {
+            throw new InvalidOperationException(
+                $"Tablica '{name}' ma {values.Length} elementów, ale oczekiwano {expectedSize} dla macierzy {matrixWidth}x{matrixHeight}.");
+        }
+
+        var matrix = new double[matrixHeight][];
+        for (var row = 0; row < matrixHeight; row++)
+        {
+            var offset = row * matrixWidth;
+            var rowValues = new double[matrixWidth];
+            Array.Copy(values, offset, rowValues, 0, matrixWidth);
+            matrix[row] = rowValues;
+        }
+
+        return matrix;
+    }
+
     public PythonService(HttpClient httpClient, IConfiguration configuration)
     {
         _httpClient = httpClient;
@@ -25,9 +51,11 @@ public class PythonService
     }
 
     public MultiIndexGroupingResultDto RunMultiIndexGrouping(
-        List<List<double>> ndvi,
-        List<List<double>> gndvi,
-        List<List<double>> ndwi,
+        double[] ndvi,
+        double[] gndvi,
+        double[] ndwi,
+        int matrixWidth,
+        int matrixHeight,
         double[][] fieldPoints,
         double ndviMin,
         double ndviMax,
@@ -41,11 +69,17 @@ public class PythonService
 
         try
         {
+            var ndviMatrix = ToJaggedMatrix(ndvi, matrixWidth, matrixHeight, nameof(ndvi));
+            var gndviMatrix = ToJaggedMatrix(gndvi, matrixWidth, matrixHeight, nameof(gndvi));
+            var ndwiMatrix = ToJaggedMatrix(ndwi, matrixWidth, matrixHeight, nameof(ndwi));
+
             var payload = new
             {
-                ndvi,
-                gndvi,
-                ndwi,
+                ndvi = ndviMatrix,
+                gndvi = gndviMatrix,
+                ndwi = ndwiMatrix,
+                matrix_width = matrixWidth,
+                matrix_height = matrixHeight,
                 field_points = fieldPoints,
                 thresholds = new
                 {
@@ -62,7 +96,13 @@ public class PythonService
             var response = _httpClient.PostAsJsonAsync("multi-index-grouping", payload, _jsonOptions)
                 .GetAwaiter()
                 .GetResult();
-            response.EnsureSuccessStatusCode();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                throw new InvalidOperationException(
+                    $"Python API zwróciło {(int)response.StatusCode} ({response.ReasonPhrase}). {errorBody}");
+            }
 
             var result = response.Content.ReadFromJsonAsync<MultiIndexGroupingResultDto>(_jsonOptions)
                 .GetAwaiter()

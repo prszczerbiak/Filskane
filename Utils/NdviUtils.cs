@@ -14,7 +14,7 @@ public static class NdviUtils
     /// <param name="tiffBytes">Tablica bajtowa zawierająca potrzebne m.in. pasma</param>
     /// <returns>Macierz liczb typu zmiennoprzecinkowego podwójnej precyzji, zawierająca NDVI wejściowego obrazu</returns>
     /// <exception cref="Exception"></exception>
-    public static double[,] CalculateNdvi(byte[] tiffBytes)
+    public static (double[] Data, int Width, int Height) CalculateNdvi(byte[] tiffBytes)
     {
         Gdal.AllRegister();
         string memPath = $"/vsimem/ndvi_calc_{Guid.NewGuid()}.tif";
@@ -37,28 +37,25 @@ public static class NdviUtils
             bandRed.ReadRaster(0, 0, width, height, redBuffer, width, height, 0, 0);
             bandNir.ReadRaster(0, 0, width, height, nirBuffer, width, height, 0, 0);
 
-            double[,] result = new double[height, width];
+            double[] result = new double[height * width];
 
             for (int i = 0; i < width * height; i++)
             {
-                int y = i / width;
-                int x = i % width;
-
                 double red = redBuffer[i];
                 double nir = nirBuffer[i];
 
                 if (nir + red == 0)
                 {
-                    result[y, x] = 0;
+                    result[i] = 0;
                 }
                 else
                 {
                     double val = (nir - red) / (nir + red);
-                    result[y, x] = Math.Clamp(val, -1.0, 1.0);
+                    result[i] = double.IsFinite(val) ? Math.Clamp(val, -1.0, 1.0) : 0;
                 }
             }
 
-            return result;
+            return (result, width, height);
         }
         finally
         {
@@ -72,7 +69,7 @@ public static class NdviUtils
     /// <param name="tiffBytes">Tablica bajtowa zawierająca potrzebne m.in. pasma</param>
     /// <returns>Macierz liczb typu zmiennoprzecinkowego podwójnej precyzji, zawierająca GNDVI wejściowego obrazu</returns>
     /// <exception cref="Exception"></exception>
-    public static double[,] CalculateGndvi(byte[] tiffBytes)
+    public static (double[] Data, int Width, int Height) CalculateGndvi(byte[] tiffBytes)
     {
         Gdal.AllRegister();
         string memPath = $"/vsimem/gndvi_calc_{Guid.NewGuid()}.tif";
@@ -95,28 +92,25 @@ public static class NdviUtils
             bandGreen.ReadRaster(0, 0, width, height, greenBuffer, width, height, 0, 0);
             bandNir.ReadRaster(0, 0, width, height, nirBuffer, width, height, 0, 0);
 
-            double[,] result = new double[height, width];
+            double[] result = new double[height * width];
 
             for (int i = 0; i < width * height; i++)
             {
-                int y = i / width;
-                int x = i % width;
-
                 double green = greenBuffer[i];
                 double nir = nirBuffer[i];
 
                 if (nir + green == 0)
                 {
-                    result[y, x] = 0;
+                    result[i] = 0;
                 }
                 else
                 {
                     double val = (nir - green) / (nir + green);
-                    result[y, x] = Math.Clamp(val, -1.0, 1.0);
+                    result[i] = double.IsFinite(val) ? Math.Clamp(val, -1.0, 1.0) : 0;
                 }
             }
 
-            return result;
+            return (result, width, height);
         }
         finally
         {
@@ -130,7 +124,7 @@ public static class NdviUtils
     /// <param name="tiffBytes">Tablica bajtowa zawierająca potrzebne m.in. pasma</param>
     /// <returns>Macierz liczb typu zmiennoprzecinkowego podwójnej precyzji, zawierająca SAVI wejściowego obrazu</returns>
     /// <exception cref="Exception"></exception>
-    public static double[,] CalculateSavi(byte[] tiffBytes)
+    public static (double[] Data, int Width, int Height) CalculateSavi(byte[] tiffBytes)
     {
         Gdal.AllRegister();
         string memPath = $"/vsimem/savi_calc_{Guid.NewGuid()}.tif";
@@ -153,29 +147,26 @@ public static class NdviUtils
             bandRed.ReadRaster(0, 0, width, height, redBuffer, width, height, 0, 0);
             bandNir.ReadRaster(0, 0, width, height, nirBuffer, width, height, 0, 0);
 
-            double[,] result = new double[height, width];
+            double[] result = new double[height * width];
             double L = 0.5;
 
             for (int i = 0; i < width * height; i++)
             {
-                int y = i / width;
-                int x = i % width;
-
                 double red = redBuffer[i] / 10000.0;
                 double nir = nirBuffer[i] / 10000.0;
 
                 if (nir + red + L == 0)
                 {
-                    result[y, x] = 0;
+                    result[i] = 0;
                 }
                 else
                 {
                     double val = ((nir - red) / (nir + red + L)) * (1.0 + L);
-                    result[y, x] = Math.Clamp(val, -1.0, 1.0);
+                    result[i] = double.IsFinite(val) ? Math.Clamp(val, -1.0, 1.0) : 0;
                 }
             }
 
-            return result;
+            return (result, width, height);
         }
         finally
         {
@@ -189,7 +180,7 @@ public static class NdviUtils
     /// <param name="tiffBytes">Tablica bajtowa zawierająca potrzebne m.in. pasma</param>
     /// <returns>Macierz liczb typu zmiennoprzecinkowego podwójnej precyzji, zawierająca NDWI wejściowego obrazu</returns>
     /// <exception cref="Exception"></exception>
-    public static double[,] CalculateNdwi(byte[] tiffBytes)
+    public static (double[] Data, int Width, int Height) CalculateNdwi(byte[] tiffBytes)
     {
         Gdal.AllRegister();
         string memPath = $"/vsimem/ndwi_calc_{Guid.NewGuid()}.tif";
@@ -212,28 +203,25 @@ public static class NdviUtils
             bandNir.ReadRaster(0, 0, width, height, nirBuffer, width, height, 0, 0);
             bandSwir.ReadRaster(0, 0, width, height, swirBuffer, width, height, 0, 0);
 
-            double[,] result = new double[height, width];
+            double[] result = new double[height * width];
 
             for (int i = 0; i < width * height; i++)
             {
-                int y = i / width;
-                int x = i % width;
-
                 double nir = nirBuffer[i];
                 double swir = swirBuffer[i];
 
                 if (nir + swir == 0)
                 {
-                    result[y, x] = 0;
+                    result[i] = 0;
                 }
                 else
                 {
                     double val = (nir - swir) / (nir + swir);
-                    result[y, x] = Math.Clamp(val, -1.0, 1.0);
+                    result[i] = double.IsFinite(val) ? Math.Clamp(val, -1.0, 1.0) : 0;
                 }
             }
 
-            return result;
+            return (result, width, height);
         }
         finally
         {
@@ -247,7 +235,7 @@ public static class NdviUtils
     /// <param name="tiffBytes">Tablica bajtowa zawierająca potrzebne m.in. pasma</param>
     /// <returns>Macierz liczb typu zmiennoprzecinkowego podwójnej precyzji, zawierająca EVI wejściowego obrazu</returns>
     /// <exception cref="Exception"></exception>
-    public static double[,] CalculateEvi(byte[] tiffBytes)
+    public static (double[] Data, int Width, int Height) CalculateEvi(byte[] tiffBytes)
     {
         Gdal.AllRegister();
         string memPath = $"/vsimem/evi_calc_{Guid.NewGuid()}.tif";
@@ -273,13 +261,10 @@ public static class NdviUtils
             bandRed.ReadRaster(0, 0, width, height, redBuffer, width, height, 0, 0);
             bandNir.ReadRaster(0, 0, width, height, nirBuffer, width, height, 0, 0);
 
-            double[,] result = new double[height, width];
+            double[] result = new double[height * width];
 
             for (int i = 0; i < width * height; i++)
             {
-                int y = i / width;
-                int x = i % width;
-
                 double blue = blueBuffer[i] / 10000.0;
                 double red = redBuffer[i] / 10000.0;
                 double nir = nirBuffer[i] / 10000.0;
@@ -288,16 +273,16 @@ public static class NdviUtils
 
                 if (denominator == 0)
                 {
-                    result[y, x] = 0;
+                    result[i] = 0;
                 }
                 else
                 {
                     double val = 2.5 * ((nir - red) / denominator);
-                    result[y, x] = Math.Clamp(val, -1.0, 1.0);
+                    result[i] = double.IsFinite(val) ? Math.Clamp(val, -1.0, 1.0) : 0;
                 }
             }
 
-            return result;
+            return (result, width, height);
         }
         finally
         {

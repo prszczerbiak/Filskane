@@ -54,6 +54,12 @@ document.addEventListener("DOMContentLoaded", () => {
     let map = L.map('map').setView([50.800667, 19.124278], 13);
     let selectMap, addFieldMap;
     let marker = null, tempMarker = null, addFieldMarker = null;
+    let vehicleLayer = L.layerGroup().addTo(map);
+    let vehicleMarkersById = new Map();
+    let selectedVehicleId = null;
+    let trackedVehicles = [];
+    let vehicleTrackingInterval = null;
+    let vehiclePositionRefreshInProgress = false;
     let selectedCoords = null;
     let drawnItems = null;
     let userFieldsLayer = L.layerGroup().addTo(map);
@@ -74,6 +80,13 @@ document.addEventListener("DOMContentLoaded", () => {
         iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
         shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
         iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+    });
+
+    const vehicleIcon = L.divIcon({
+        className: 'vehicle-map-icon',
+        html: '<div style="width:14px;height:14px;border-radius:50%;background:#1976d2;border:2px solid #ffffff;box-shadow:0 0 4px rgba(0,0,0,0.35);"></div>',
+        iconSize: [18, 18],
+        iconAnchor: [9, 9]
     });
 
     // ============================================================
@@ -102,6 +115,23 @@ document.addEventListener("DOMContentLoaded", () => {
     L.control.addField = function (opts) { return new L.Control.AddField(opts); }
     L.control.addField({ position: 'topright' }).addTo(map);
 
+    L.Control.AddVehicle = L.Control.extend({
+        onAdd: function () {
+            const btn = L.DomUtil.create('button', 'add-vehicle-btn');
+            btn.innerHTML = `<span class="plus-icon">+</span> Dodaj pojazd`;
+            btn.style.cursor = 'pointer';
+            L.DomEvent.disableClickPropagation(btn);
+            L.DomEvent.disableScrollPropagation(btn);
+            L.DomEvent.on(btn, 'click', function (e) {
+                L.DomEvent.stopPropagation(e);
+                document.getElementById('addVehicleModal').style.display = 'flex';
+            });
+            return btn;
+        }
+    });
+    L.control.addVehicle = function (opts) { return new L.Control.AddVehicle(opts); }
+    L.control.addVehicle({ position: 'topright' }).addTo(map);
+
     // ============================================================
     // 4. FUNKCJE POMOCNICZE MAPY
     // ============================================================
@@ -115,6 +145,159 @@ document.addEventListener("DOMContentLoaded", () => {
                     <button id="deleteFarmBtn" class="btn-danger" style="display: block; margin: 5px auto;">Usuń</button>
                 </div>
             `);
+    }
+
+    function escapeHtml(value) {
+        return String(value)
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
+    }
+
+    function normalizeVehicle(vehicle) {
+        const id = Number(vehicle?.id);
+        const lat = Number(vehicle?.lat);
+        const lng = Number(vehicle?.lng);
+
+        if (!Number.isFinite(id) || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+            return null;
+        }
+
+        return {
+            id,
+            name: String(vehicle?.name || 'Pojazd'),
+            ipAdress: vehicle?.ipAdress || vehicle?.ipAddress || '',
+            tcpPort: Number(vehicle?.tcpPort),
+            lat,
+            lng
+        };
+    }
+
+    function renderVehicles(vehicles) {
+        vehicleLayer.clearLayers();
+        vehicleMarkersById.clear();
+
+        const normalizedVehicles = Array.isArray(vehicles)
+            ? vehicles.map(normalizeVehicle).filter(Boolean)
+            : [];
+
+        if (normalizedVehicles.length === 0) return;
+
+        normalizedVehicles.forEach(vehicle => {
+
+            const vehicleMarker = L.marker([vehicle.lat, vehicle.lng], { icon: vehicleIcon }).addTo(vehicleLayer);
+            vehicleMarkersById.set(vehicle.id, vehicleMarker);
+            vehicleMarker.bindPopup(`
+                <div style="text-align:center;">
+                    <b>${escapeHtml(vehicle.name || 'Pojazd')}</b>
+                    <button class="btn-danger delete-vehicle-btn" data-id="${vehicle.id}" style="display:block;margin:8px auto 0 auto;">Usuń</button>
+                </div>
+            `);
+
+            vehicleMarker.on('popupopen', (e) => {
+                const popupEl = e.popup?.getElement();
+                if (!popupEl) return;
+
+                const deleteBtn = popupEl.querySelector('.delete-vehicle-btn');
+                if (deleteBtn) {
+                    deleteBtn.onclick = (ev) => {
+                        ev.preventDefault();
+                        selectedVehicleId = Number(deleteBtn.getAttribute('data-id'));
+                        document.getElementById('deleteVehicleModal').style.display = 'flex';
+                    };
+                }
+            });
+        });
+    }
+
+    async function startVehicleTracking(vehicle) {
+        if (!vehicle?.id || !vehicle?.ipAdress || !Number.isFinite(Number(vehicle?.tcpPort))) return;
+
+        const res = await fetch(`/api/iot/vehicle/start/${vehicle.id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                host: vehicle.ipAdress,
+                port: vehicle.tcpPort,
+                initialLat: vehicle.lat,
+                initialLng: vehicle.lng,
+                type: vehicle.name
+            })
+        });
+
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.message || `Nie udało się uruchomić śledzenia pojazdu ${vehicle.name}`);
+        }
+    }
+
+    async function refreshVehiclePositions() {
+        if (vehiclePositionRefreshInProgress || trackedVehicles.length === 0) return;
+
+        vehiclePositionRefreshInProgress = true;
+        try {
+            const results = await Promise.allSettled(trackedVehicles.map(async vehicle => {
+                const res = await fetch(`/api/iot/vehicle/latest/${vehicle.id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.status === 204 || !res.ok) return;
+
+                const data = await res.json();
+                const lat = Number(data?.lat);
+                const lng = Number(data?.lng);
+                const marker = vehicleMarkersById.get(vehicle.id);
+
+                if (marker && Number.isFinite(lat) && Number.isFinite(lng)) {
+                    marker.setLatLng([lat, lng]);
+                }
+            }));
+
+            results.forEach(result => {
+                if (result.status === 'rejected') {
+                    console.warn('Błąd odczytu pozycji pojazdu:', result.reason);
+                }
+            });
+        } finally {
+            vehiclePositionRefreshInProgress = false;
+        }
+    }
+
+    async function initializeVehicleTracking(vehicles) {
+        await stopVehicleTracking();
+
+        trackedVehicles = Array.isArray(vehicles)
+            ? vehicles.map(normalizeVehicle).filter(v => v && v.ipAdress && Number.isFinite(v.tcpPort))
+            : [];
+
+        if (trackedVehicles.length === 0) return;
+
+        await Promise.allSettled(trackedVehicles.map(startVehicleTracking));
+        await refreshVehiclePositions();
+
+        vehicleTrackingInterval = setInterval(refreshVehiclePositions, 1500);
+    }
+
+    async function stopVehicleTracking() {
+        if (vehicleTrackingInterval) {
+            clearInterval(vehicleTrackingInterval);
+            vehicleTrackingInterval = null;
+        }
+
+        const vehiclesToStop = trackedVehicles;
+        trackedVehicles = [];
+
+        if (vehiclesToStop.length === 0) return;
+
+        await Promise.allSettled(vehiclesToStop.map(vehicle => fetch(`/api/iot/vehicle/stop/${vehicle.id}`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        })));
     }
 
     function createFieldLayer(layer, fieldName, fieldId = null) {
@@ -174,6 +357,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 map.flyTo([data.farmY, data.farmX], 16);
             }
         });
+
+    fetch('/api/farm/getUserVehicles', { headers: { "Authorization": "Bearer " + token } })
+        .then(async res => {
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Błąd serwera");
+            renderVehicles(Array.isArray(data) ? data : []);
+            await initializeVehicleTracking(Array.isArray(data) ? data : []);
+        })
+        .catch(err => console.error("Błąd pojazdów:", err));
 
     // Pola
     fetch('/api/farm/getUserFields', { headers: { "Authorization": "Bearer " + token } })
@@ -298,6 +490,31 @@ document.addEventListener("DOMContentLoaded", () => {
             .catch(err => alert("Problem przy zapisie: " + err));
     });
 
+    document.getElementById('addVehicleBtn').addEventListener('click', () => {
+        const vehicleName = document.getElementById('vehicleNameInput').value.trim();
+        const ipAdress = document.getElementById('vehicleIpInput').value.trim();
+        const tcpPort = Number(document.getElementById('vehiclePortInput').value);
+
+        if (!vehicleName) return alert("Podaj nazwę pojazdu!");
+        if (!ipAdress) return alert("Podaj adres IP pojazdu!");
+        if (!Number.isInteger(tcpPort) || tcpPort < 1 || tcpPort > 65535) {
+            return alert("Podaj poprawny port TCP z zakresu 1-65535!");
+        }
+
+        fetch('api/farm/saveVehicle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': "Bearer " + token },
+            body: JSON.stringify({ vehicleName, ipAdress, tcpPort })
+        })
+            .then(async res => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.error || "Błąd zapisu pojazdu!");
+                alert("Pojazd zapisany!");
+                window.location.reload();
+            })
+            .catch(err => alert("Problem przy zapisie: " + err.message));
+    });
+
     // Obsługa farmy
     document.getElementById('createFarmBtn').addEventListener('click', () => {
         document.getElementById("noFarmModal").style.display = 'none';
@@ -346,6 +563,28 @@ document.addEventListener("DOMContentLoaded", () => {
         window.location.href = '/dashboard.html';
     });
 
+    document.getElementById('confirmDeleteVehicleBtn').addEventListener("click", (ev) => {
+        ev.preventDefault();
+        if (!selectedVehicleId) {
+            alert("Najpierw wybierz pojazd do usunięcia.");
+            return;
+        }
+
+        fetch(`/api/farm/deleteVehicle/${selectedVehicleId}`, {
+            method: 'DELETE',
+            headers: { "Authorization": "Bearer " + token }
+        })
+            .then(async res => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.error || "Błąd usuwania pojazdu");
+
+                document.getElementById('deleteVehicleModal').style.display = "none";
+                selectedVehicleId = null;
+                window.location.reload();
+            })
+            .catch(err => alert(err.message));
+    });
+
     document.getElementById('confirmDeleteFieldBtn').addEventListener("click", () => {
         if (!selectedFieldId) return;
         fetch(`/api/farm/deleteField/${selectedFieldId}`, { method: 'DELETE', headers: { "Authorization": "Bearer " + token } })
@@ -362,10 +601,19 @@ document.addEventListener("DOMContentLoaded", () => {
     // Zamykanie modali i wyjście
     document.getElementById('cancelSetFarmBtn').addEventListener('click', () => document.getElementById('setFarmModal').style.display = 'none');
     document.getElementById('cancelAddFieldBtn').addEventListener('click', () => document.getElementById('drawFieldModal').style.display = 'none');
+    document.getElementById('cancelAddVehicleBtn').addEventListener('click', () => document.getElementById('addVehicleModal').style.display = 'none');
     document.getElementById('cancelDeleteBtn').addEventListener("click", () => document.getElementById('deleteFarmModal').style.display = "none");
     document.getElementById('cancelDeleteFieldBtn').addEventListener("click", () => document.getElementById('deleteFieldModal').style.display = "none");
+    document.getElementById('cancelDeleteVehicleBtn').addEventListener("click", () => {
+        selectedVehicleId = null;
+        document.getElementById('deleteVehicleModal').style.display = "none";
+    });
     document.getElementById('cancelNamedFieldBtn').addEventListener("click", () => document.getElementById('nameFieldModal').style.display = "none");
     document.getElementById('exitBtn').addEventListener('click', () => window.location.href = '/dashboard.html');
+
+    window.addEventListener('beforeunload', () => {
+        void stopVehicleTracking();
+    });
 
     // ============================================================
     // 8. OBSŁUGA POWROTU I ZMIANY MOTYWU (ATOMOWA)

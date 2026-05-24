@@ -71,6 +71,7 @@ builder.Services.AddScoped<FarmDAL>();
 builder.Services.AddScoped<FieldDAL>();
 builder.Services.AddScoped<ScanDAL>();
 builder.Services.AddScoped<SettingsDAL>();
+builder.Services.AddScoped<VehicleDAL>();
 
 // --- Warstwa Logiki Biznesowej (Services) ---
 // Rejestracja serwisów realizuj¹cych logikê domeny systemu Filskane
@@ -80,6 +81,7 @@ builder.Services.AddScoped<FieldService>();
 builder.Services.AddScoped<FieldsListService>();
 builder.Services.AddScoped<AnalysisService>();
 builder.Services.AddScoped<SettingsService>();
+builder.Services.AddSingleton<IoTService>();
 
 // --- Infrastruktura i Integracje ---
 // Serwis haszuj¹cy has³a (algorytm Argon2) - zarejestrowany jako Singleton (bezstanowy)

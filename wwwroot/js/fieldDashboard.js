@@ -37,6 +37,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const STATE = {
         fieldData: null,
         ndviCache: null,
+        indexWidth: 0,
+        indexHeight: 0,
         selectedZip: null,
         scanBboxCache: null,
         currentAnalysis: 'NDVI'
@@ -175,6 +177,15 @@ document.addEventListener("DOMContentLoaded", () => {
             case 'ac': return (areaM2 / 4046.86).toFixed(3) + " ac";
             default: return (areaM2 / 10000).toFixed(4) + " ha";
         }
+    }
+
+    function setIndexData(json) {
+        const indexValues = json?.ndvi ?? json?.indexMatrix ?? json;
+        STATE.ndviCache = Array.isArray(indexValues) ? indexValues : [];
+        STATE.indexWidth = Number(json?.matrixWidth ?? json?.MatrixWidth ?? 0);
+        STATE.indexHeight = Number(json?.matrixHeight ?? json?.MatrixHeight ?? 0);
+        STATE.scanBboxCache = json?.fieldBbox || STATE.fieldData.minBbox;
+        return STATE.ndviCache;
     }
 
     // ============================================================
@@ -330,14 +341,14 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             const json = await resData.json();
-            const ndviData = json.ndvi || json;
-            STATE.ndviCache = ndviData;
-            STATE.scanBboxCache = json.fieldBbox || STATE.fieldData.minBbox;
+            const ndviData = setIndexData(json);
 
             const resViz = await apiCall('/visualize', 'POST', {
                 indexMatrix: ndviData,
+                matrixWidth: STATE.indexWidth,
+                matrixHeight: STATE.indexHeight,
                 fieldBbox: STATE.fieldData.geojson,
-                bbox: json.fieldBbox || STATE.fieldData.minBbox,
+                bbox: STATE.scanBboxCache,
                 analysisType: 'NDVI'
             });
 
@@ -362,14 +373,14 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             const json = await resData.json();
-            const ndviData = json.ndvi || json;
-            STATE.ndviCache = ndviData;
-            STATE.scanBboxCache = json.fieldBbox || STATE.fieldData.minBbox;
+            const ndviData = setIndexData(json);
 
             const resViz = await apiCall('/visualize', 'POST', {
                 indexMatrix: ndviData,
+                matrixWidth: STATE.indexWidth,
+                matrixHeight: STATE.indexHeight,
                 fieldBbox: STATE.fieldData.geojson,
-                bbox: json.fieldBbox || STATE.fieldData.minBbox,
+                bbox: STATE.scanBboxCache,
                 analysisType: 'GNDVI'
             });
 
@@ -394,14 +405,14 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             const json = await resData.json();
-            const ndviData = json.ndvi || json;
-            STATE.ndviCache = ndviData;
-            STATE.scanBboxCache = json.fieldBbox || STATE.fieldData.minBbox;
+            const ndviData = setIndexData(json);
 
             const resViz = await apiCall('/visualize', 'POST', {
                 indexMatrix: ndviData,
+                matrixWidth: STATE.indexWidth,
+                matrixHeight: STATE.indexHeight,
                 fieldBbox: STATE.fieldData.geojson,
-                bbox: json.fieldBbox || STATE.fieldData.minBbox,
+                bbox: STATE.scanBboxCache,
                 analysisType: 'SAVI'
             });
 
@@ -426,14 +437,14 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             const json = await resData.json();
-            const ndviData = json.ndvi || json;
-            STATE.ndviCache = ndviData;
-            STATE.scanBboxCache = json.fieldBbox || STATE.fieldData.minBbox;
+            const ndviData = setIndexData(json);
 
             const resViz = await apiCall('/visualize', 'POST', {
                 indexMatrix: ndviData,
+                matrixWidth: STATE.indexWidth,
+                matrixHeight: STATE.indexHeight,
                 fieldBbox: STATE.fieldData.geojson,
-                bbox: json.fieldBbox || STATE.fieldData.minBbox,
+                bbox: STATE.scanBboxCache,
                 analysisType: 'NDWI'
             });
 
@@ -458,14 +469,14 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             const json = await resData.json();
-            const ndviData = json.ndvi || json;
-            STATE.ndviCache = ndviData;
-            STATE.scanBboxCache = json.fieldBbox || STATE.fieldData.minBbox;
+            const ndviData = setIndexData(json);
 
             const resViz = await apiCall('/visualize', 'POST', {
                 indexMatrix: ndviData,
+                matrixWidth: STATE.indexWidth,
+                matrixHeight: STATE.indexHeight,
                 fieldBbox: STATE.fieldData.geojson,
-                bbox: json.fieldBbox || STATE.fieldData.minBbox,
+                bbox: STATE.scanBboxCache,
                 analysisType: 'EVI'
             });
 
@@ -491,6 +502,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 plantId: STATE.fieldData.cropId,
                 cycleId: STATE.fieldData.plantStateId,
                 vegetationIndex: STATE.ndviCache,
+                matrixWidth: STATE.indexWidth,
+                matrixHeight: STATE.indexHeight,
                 analysisType: STATE.currentAnalysis || 'NDVI',
                 fieldGeojson: STATE.fieldData.geojson,
                 imageBbox: STATE.scanBboxCache,

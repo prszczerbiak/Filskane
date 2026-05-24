@@ -27,10 +27,19 @@ public static class GeoUtils
         if (points.Count == 0)
             return null;
 
-        double minX = points.Min(p => p.X);
-        double maxX = points.Max(p => p.X);
-        double minY = points.Min(p => p.Y);
-        double maxY = points.Max(p => p.Y);
+        double minX = points[0].X;
+        double maxX = points[0].X;
+        double minY = points[0].Y;
+        double maxY = points[0].Y;
+
+        for (int i = 1; i < points.Count; i++)
+        {
+            var p = points[i];
+            if (p.X < minX) minX = p.X;
+            if (p.X > maxX) maxX = p.X;
+            if (p.Y < minY) minY = p.Y;
+            if (p.Y > maxY) maxY = p.Y;
+        }
 
         return new Bbox(minX, minY, maxX, maxY);
     }
