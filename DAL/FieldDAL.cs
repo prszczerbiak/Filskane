@@ -1,9 +1,10 @@
-﻿using System.Data;
-using System.Text;
+﻿using Filskane.Models;
+using Filskane.Utils;
 using Oracle.ManagedDataAccess.Client;
 using Oracle.ManagedDataAccess.Types;
-using Filskane.Models;
-using Filskane.Utils;
+using System.Data;
+using System.Text;
+using System.Text.Json;
 
 namespace Filskane.DAL;
 /// <summary>
@@ -194,6 +195,10 @@ public class FieldDAL : BaseDAL
             if (await reader.ReadAsync())
             {
                 string geoJson = reader["GEO_JSON"]?.ToString() ?? "";
+                JsonElement geoJsonElement = string.IsNullOrWhiteSpace(geoJson)
+                ? default
+                : JsonDocument.Parse(geoJson).RootElement.Clone();
+
                 Bbox? bbox = GeoUtils.GetBboxFromGeoJson(geoJson);
 
                 return new FieldDetailDto(
@@ -208,7 +213,7 @@ public class FieldDAL : BaseDAL
                     GetSafeString(reader["TYPE_NAME"]),
                     GetSafeString(reader["SUBSTRATE_NAME"]),
                     Convert.ToDouble(reader["AREA_M2"] is DBNull ? 0 : reader["AREA_M2"]),
-                    geoJson,
+                    geoJsonElement,
                     bbox
                 );
             }

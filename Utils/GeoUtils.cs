@@ -75,10 +75,10 @@ public static class GeoUtils
     public static bool IsFieldWithinRaster(Bbox? rasterBbox, JsonElement fieldGeoJson)
     {
         return rasterBbox is not null && GetBboxFromGeoJson(fieldGeoJson) is {} fieldBbox &&
-                fieldBbox.MinX >= rasterBbox.MinX &&
-                fieldBbox.MaxX <= rasterBbox.MaxX &&
-                fieldBbox.MinY >= rasterBbox.MinY &&
-                fieldBbox.MaxY <= rasterBbox.MaxY;
+                fieldBbox.MinX >= rasterBbox.Value.MinX &&
+                fieldBbox.MaxX <= rasterBbox.Value.MaxX &&
+                fieldBbox.MinY >= rasterBbox.Value.MinY &&
+                fieldBbox.MaxY <= rasterBbox.Value.MaxY;
     }
 
     /// <summary>
@@ -97,16 +97,16 @@ public static class GeoUtils
 
         var resultPoints = new PointF[ring.GetArrayLength()];
 
-        float dX = (float)((rasterBbox.MaxX.Value - rasterBbox.MinX.Value) / imgWidth);
-        float dY = (float)((rasterBbox.MaxY.Value - rasterBbox.MinY.Value) / imgHeight);
+        float dX = (float)((rasterBbox.Value.MaxX - rasterBbox.Value.MinX) / imgWidth);
+        float dY = (float)((rasterBbox.Value.MaxY - rasterBbox.Value.MinY) / imgHeight);
 
         int i = -1;
         foreach (var point in ring.EnumerateArray())
         {
             double x = point[0].GetDouble();
             double y = point[1].GetDouble();
-            float px = (float)((x - rasterBbox.MinX.Value) / dX);
-            float py = (float)((rasterBbox.MaxY.Value - y) / dY);
+            float px = (float)((x - rasterBbox.Value.MinX) / dX);
+            float py = (float)((rasterBbox.Value.MaxY - y) / dY);
             resultPoints[++i] = new PointF(px, py);
         }
 
@@ -121,17 +121,17 @@ public static class GeoUtils
     /// <param name="imgWidth">Szerokość zdjęcia</param>
     /// <param name="imgHeight">Wyokość zdjęcia</param>
     /// <returns>Tablica zawierająca współrzędne punktów leżacych w granicy pola</returns>
-    public static List<(int X, int Y)> GetPixelsFromInsidePolygonAsArray(JsonElement geoJson, Bbox rasterBbox, int imgWidth, int imgHeight)
+    public static List<(int X, int Y)> GetPixelsFromInsidePolygonAsArray(JsonElement geoJson, Bbox? rasterBbox, int imgWidth, int imgHeight)
     {
         var polygonPixels = GetPolygonPixels(geoJson, rasterBbox, imgWidth, imgHeight);
 
-        if (polygonPixels.Length == 0) return Array.Empty<(int X, int Y)>();
+        if (polygonPixels.Length == 0) return [];
 
       
-        float minX = MinValue;
-        float maxX = MaxValue;
-        float minY = MinValue;
-        float maxY = MaxValue;
+        float minX = float.MinValue;
+        float maxX = float.MaxValue;
+        float minY = float.MinValue;
+        float maxY = float.MaxValue;
 
         foreach (var pixel in polygonPixels){
             minX = Math.Min(minX, pixel.X);

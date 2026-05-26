@@ -19,7 +19,7 @@ namespace Filskane.Models
         string SoilType,
         string SoilSubstrate,
         double Area,
-        string Geojson,
+        JsonElement Geojson,
         Bbox? MinBbox
     );
 
@@ -76,13 +76,13 @@ namespace Filskane.Models
     public record UpdateTiffsDto(
         DateTime Date,
         IFormFile? Zip,
-        string? Geojson
+        JsonElement Geojson
     );
 
     /// <summary>
     /// Prosty wrapper na GeoJSON wysyłany w żądaniach.
     /// </summary>
-    public record ScanRequestDto(string Geojson);
+    public record ScanRequestDto(JsonElement Geojson);
 
     /// <summary>
     /// Dane wejściowe do wygenerowania wizualizacji graficznej (PNG) indeksu NDVI.
@@ -94,7 +94,7 @@ namespace Filskane.Models
         double[] IndexMatrix,
         int MatrixWidth,
         int MatrixHeight,
-        string? FieldGeoJson,
+        JsonElement FieldGeoJson,
         Bbox? Bbox,
         string? AnalysisType = null
     );
@@ -135,7 +135,7 @@ namespace Filskane.Models
         public int MatrixWidth { get; init; }
         public int MatrixHeight { get; init; }
         public string AnalysisType { get; init; } = "NDVI";
-        public string? FieldGeojson { get; init; }
+        public JsonElement FieldGeojson { get; init; }
         public Bbox? ImageBbox { get; init; }
         public bool DarkMode { get; init; } = false;
     }

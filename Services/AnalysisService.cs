@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using Filskane.Models;
 using Filskane.Utils;
 using Filskane.DAL;
+using System.Text.Json;
 
 namespace Filskane.Services;
 
@@ -35,7 +36,7 @@ public class AnalysisService
     /// <param name="scanId">ID konkretnego skanu (opcjonalne, domyślnie najnowszy).</param>
     /// <param name="geojson">Geometria pola (GeoJSON) do wyrysowania granic.</param>
     /// <returns>Krotka zawierająca bajty obrazu PNG i datę skanu.</returns>
-    public async Task<(byte[]? PngBytes, DateTime? Date)> GetVisualizedScanAsync(string username, int fieldId, int? scanId, string geojson)
+    public async Task<(byte[]? PngBytes, DateTime? Date)> GetVisualizedScanAsync(string username, int fieldId, int? scanId, JsonElement geojson)
     {
         ScanResultDto? scan = scanId.HasValue
             ? await _scanDal.GetScanByIdAsync(username, scanId.Value)
@@ -54,7 +55,7 @@ public class AnalysisService
         return (rgbImage, scan.ScanDate);
     }
 
-    public async Task<(byte[]? PngBytes, DateTime? Date)> PrepareOverallAnalysisAsync(string username, int fieldId, string geojson)
+    public async Task<(byte[]? PngBytes, DateTime? Date)> PrepareOverallAnalysisAsync(string username, int fieldId, JsonElement geojson)
     {
         ScanResultDto? scan = await _scanDal.GetLatestScanAsync(username, fieldId);
 
@@ -74,8 +75,11 @@ public class AnalysisService
         int height = ndvi.Height;
         int width = ndvi.Width;
         var fieldPixels = (scan.FieldBbox != null && width > 0 && height > 0)
-            ? GeoUtils.GetPixelsInsidePolygonAsArray(field.Geojson, scan.FieldBbox, width, height)
-            : Array.Empty<double[]>();
+            ? GeoUtils.GetPixelsFromInsidePolygonAsArray(field.Geojson, scan.FieldBbox, width, height)
+            : [];
+        var fieldPixelsForGrouping = fieldPixels
+            .Select(p => new double[] { p.X, p.Y })
+            .ToArray();
 
         var ndviThreshold = await _fieldDal.GetThresholdAsync(field.CropId.Value, field.PlantStateId.Value, "NDVI");
         var gndviThreshold = await _fieldDal.GetThresholdAsync(field.CropId.Value, field.PlantStateId.Value, "GNDVI");
@@ -87,7 +91,7 @@ public class AnalysisService
             ndwi.Data,
             width,
             height,
-            fieldPixels,
+            fieldPixelsForGrouping,
             ndviThreshold?.MinNdvi ?? 0.2,
             ndviThreshold?.MaxNdvi ?? 0.6,
             gndviThreshold?.MinNdvi ?? 0.2,
@@ -206,7 +210,7 @@ public class AnalysisService
             ? PlotUtils.RenderNDWIHeatmap(indexArray, width, height)
             : PlotUtils.RenderVegetationHeatmap(indexArray, width, height);
 
-        if ((!string.IsNullOrEmpty(dto.FieldGeoJson)) && dto.Bbox != null)
+        if (dto.FieldGeoJson.ValueKind != JsonValueKind.Undefined && dto.FieldGeoJson.ValueKind != JsonValueKind.Null && dto.Bbox != null)
         {
             indexMap = ImageUtils.DrawGeoJsonPolygonOnImage(indexMap, dto.FieldGeoJson, dto.Bbox, true);
         }
@@ -270,14 +274,18 @@ public class AnalysisService
         int width = request.MatrixWidth;
         int height = request.MatrixHeight;
 
-        double[][] fieldPixels = GeoUtils.GetPixelsInsidePolygonAsArray(request.FieldGeojson, request.ImageBbox, width, height);
+        var fieldPixels = GeoUtils.GetPixelsFromInsidePolygonAsArray(request.FieldGeojson, request.ImageBbox, width, height);
+        var fieldPixelsForClassification = fieldPixels.ToArray();
+        var fieldPixelsForDbscan = fieldPixels
+            .Select(p => new double[] { p.X, p.Y })
+            .ToArray();
 
-        int[] labels = NdviClassifier.ClassifyPoints(fieldPixels, ndviMatrix, width, minT, maxT);
+        int[] labels = NdviClassifier.ClassifyPoints(fieldPixelsForClassification, ndviMatrix, width, minT, maxT);
 
-        var pointsForDbscan = fieldPixels.Where((p, idx) => labels[idx] == 2).ToArray();
-        var ndviForDbscan = fieldPixels
+        var pointsForDbscan = fieldPixelsForDbscan.Where((p, idx) => labels[idx] == 2).ToArray();
+        var ndviForDbscan = fieldPixelsForClassification
             .Where((p, idx) => labels[idx] == 2)
-            .Select(p => ndviMatrix[(int)p[1] * width + (int)p[0]])
+            .Select(p => ndviMatrix[p.Y * width + p.X])
             .ToArray();
 
         var (clusterIds, ndviMedians) = _pythonService.RunDbscan(pointsForDbscan, ndviForDbscan);
@@ -293,7 +301,7 @@ public class AnalysisService
                 finalLabels[i] = labels[i];
         }
 
-        var overlayBytes = ImageUtils.CreateRiskOverlayFromPoints(fieldPixels, finalLabels, width, height, ndviMedians, minT);
+        var overlayBytes = ImageUtils.CreateRiskOverlayFromPoints(fieldPixelsForDbscan, finalLabels, width, height, ndviMedians, minT);
         var baseMap = analysisType == "NDWI"
             ? PlotUtils.RenderNDWIHeatmap(ndviMatrix, width, height)
             : PlotUtils.RenderVegetationHeatmap(ndviMatrix, width, height);

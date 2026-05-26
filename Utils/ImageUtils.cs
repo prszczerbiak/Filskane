@@ -7,6 +7,7 @@ using SixLabors.ImageSharp.Processing;
 using Filskane.Models;
 using MaxRev.Gdal.Core;
 using System.Buffers;
+using System.Text.Json;
 
 namespace Filskane.Utils;
 
@@ -190,7 +191,7 @@ public static class ImageUtils
     /// <param name="bbox">Współrzędne zdjęcia w przestrzeni</param>
     /// <param name="isThick">Zmienna boolowska mówiąca czy obraz ma być grubszy (obraz ndvi)</param>
     /// <returns>Tablica bajtowa z obrazem png i naniesionym na nim zarysie pola</returns>
-    public static byte[] DrawGeoJsonPolygonOnImage(byte[] imageBytes, string geoJson, Bbox? bbox, bool isThick)
+    public static byte[] DrawGeoJsonPolygonOnImage(byte[] imageBytes, JsonElement geoJson, Bbox? bbox, bool isThick)
     {
         if (bbox == null)
             return imageBytes;
@@ -210,7 +211,7 @@ public static class ImageUtils
         
         var points = GeoUtils.GetPolygonPixels(geoJson, bbox, width, height);
 
-        if (points == null || points.Count <= 2)
+        if (points == null || points.Count() <= 2)
             return imageBytes;
 
         using var image = Image.Load(imageBytes);
