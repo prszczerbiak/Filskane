@@ -1,5 +1,4 @@
 ﻿using OSGeo.GDAL;
-using System;
 
 namespace Filskane.Utils;
 /// <summary>
@@ -7,6 +6,71 @@ namespace Filskane.Utils;
 /// </summary>
 public static class NdviUtils
 {
+
+    private static (float[] Data, int Width, int Height) CalculateTwoBandIndex(
+    byte[] tiffBytes, 
+    int band1Id, 
+    int band2Id, 
+    Func<float, float, float> formula)
+    {
+        string memPath = $"/vsimem/index_calc_{Guid.NewGuid()}.tif";
+
+        try
+        {
+            Gdal.FileFromMemBuffer(memPath, tiffBytes);
+            using var ds = Gdal.Open(memPath, Access.GA_ReadOnly);
+            if (ds == null) throw new Exception("Nie można otworzyć obrazu przez GDAL.");
+
+            int width = ds.RasterXSize;
+            int height = ds.RasterYSize;
+
+            using var band1 = ds.GetRasterBand(band1Id);
+            using var band2 = ds.GetRasterBand(band2Id);
+
+            float[] result = new float[height * width];
+            object gdalLock = new object();
+
+            Parallel.For(0, height, y =>
+            {
+                short[] row1 = System.Buffers.ArrayPool<short>.Shared.Rent(width);
+                short[] row2 = System.Buffers.ArrayPool<short>.Shared.Rent(width);
+
+                try
+                {
+                    lock (gdalLock)
+                    {
+                        band1.ReadRaster(0, y, width, 1, row1, width, 1, 0, 0);
+                        band2.ReadRaster(0, y, width, 1, row2, width, 1, 0, 0);
+                    }
+
+                    for (int x = 0; x < width; x++)
+                    {
+                        // Od razu normalizujemy do reflektancji 0-1, żeby uprościć wzory!
+                        float val1 = (ushort)row1[x] / 10000.0f;
+                        float val2 = (ushort)row2[x] / 10000.0f;
+                        
+                        int index = y * width + x; 
+
+                        float calculatedValue = formula(val1, val2);
+                        
+                        result[index] = float.IsFinite(calculatedValue) ? Math.Clamp(calculatedValue, -1.0f, 1.0f) : 0;
+                    }
+                }
+                finally
+                {
+                    System.Buffers.ArrayPool<short>.Shared.Return(row1);
+                    System.Buffers.ArrayPool<short>.Shared.Return(row2);
+                }
+            });
+
+            return (result, width, height);
+        }
+        finally
+        {
+            Gdal.Unlink(memPath);
+        }
+    }
+
     #region Public Methods
     /// <summary>
     /// Funkcja przeliczająca NDVI (Normalized Difference Vegetation Index)
@@ -14,165 +78,46 @@ public static class NdviUtils
     /// <param name="tiffBytes">Tablica bajtowa zawierająca potrzebne m.in. pasma</param>
     /// <returns>Macierz liczb typu zmiennoprzecinkowego podwójnej precyzji, zawierająca NDVI wejściowego obrazu</returns>
     /// <exception cref="Exception"></exception>
-    public static (double[] Data, int Width, int Height) CalculateNdvi(byte[] tiffBytes)
+    public static (float[] Data, int Width, int Height) CalculateNdvi(byte[] tiffBytes)
     {
-        Gdal.AllRegister();
-        string memPath = $"/vsimem/ndvi_calc_{Guid.NewGuid()}.tif";
-
-        try
+        return CalculateTwoBandIndex(tiffBytes, 3, 7, (red, nir) => 
         {
-            Gdal.FileFromMemBuffer(memPath, tiffBytes);
-            using var ds = Gdal.Open(memPath, Access.GA_ReadOnly);
-            if (ds == null) throw new Exception("Nie można otworzyć obrazu przez GDAL.");
-
-            int width = ds.RasterXSize;
-            int height = ds.RasterYSize;
-
-            using var bandRed = ds.GetRasterBand(3); // Kanał 3: B04 (Red)
-            using var bandNir = ds.GetRasterBand(7); // Kanał 7: B08 (NIR)
-
-            int[] redBuffer = new int[width * height];
-            int[] nirBuffer = new int[width * height];
-
-            bandRed.ReadRaster(0, 0, width, height, redBuffer, width, height, 0, 0);
-            bandNir.ReadRaster(0, 0, width, height, nirBuffer, width, height, 0, 0);
-
-            double[] result = new double[height * width];
-
-            for (int i = 0; i < width * height; i++)
-            {
-                double red = redBuffer[i];
-                double nir = nirBuffer[i];
-
-                if (nir + red == 0)
-                {
-                    result[i] = 0;
-                }
-                else
-                {
-                    double val = (nir - red) / (nir + red);
-                    result[i] = double.IsFinite(val) ? Math.Clamp(val, -1.0, 1.0) : 0;
-                }
-            }
-
-            return (result, width, height);
-        }
-        finally
-        {
-            Gdal.Unlink(memPath);
-        }
+            if (nir + red == 0) return 0;
+            return (nir - red) / (nir + red);
+        });
     }
 
     /// <summary>
-    /// Funkcja przeliczająca GNDVI (Green Normalized Difference Vegetation Index)
+    /// Funkcja przeliczająca Gndvi (Green Normalized Difference Vegetation Index)
     /// </summary>
     /// <param name="tiffBytes">Tablica bajtowa zawierająca potrzebne m.in. pasma</param>
-    /// <returns>Macierz liczb typu zmiennoprzecinkowego podwójnej precyzji, zawierająca GNDVI wejściowego obrazu</returns>
+    /// <returns>Macierz liczb typu zmiennoprzecinkowego podwójnej precyzji, zawierająca Gndvi wejściowego obrazu</returns>
     /// <exception cref="Exception"></exception>
-    public static (double[] Data, int Width, int Height) CalculateGndvi(byte[] tiffBytes)
+    public static (float[] Data, int Width, int Height) CalculateGndvi(byte[] tiffBytes)
     {
-        Gdal.AllRegister();
-        string memPath = $"/vsimem/gndvi_calc_{Guid.NewGuid()}.tif";
-
-        try
+        return CalculateTwoBandIndex(tiffBytes, 2, 7, (green, nir) => 
         {
-            Gdal.FileFromMemBuffer(memPath, tiffBytes);
-            using var ds = Gdal.Open(memPath, Access.GA_ReadOnly);
-            if (ds == null) throw new Exception("Nie można otworzyć obrazu przez GDAL.");
-
-            int width = ds.RasterXSize;
-            int height = ds.RasterYSize;
-
-            using var bandGreen = ds.GetRasterBand(2); // Kanał 2: B03 (Green)
-            using var bandNir = ds.GetRasterBand(7);   // Kanał 7: B08 (NIR)
-
-            int[] greenBuffer = new int[width * height];
-            int[] nirBuffer = new int[width * height];
-
-            bandGreen.ReadRaster(0, 0, width, height, greenBuffer, width, height, 0, 0);
-            bandNir.ReadRaster(0, 0, width, height, nirBuffer, width, height, 0, 0);
-
-            double[] result = new double[height * width];
-
-            for (int i = 0; i < width * height; i++)
-            {
-                double green = greenBuffer[i];
-                double nir = nirBuffer[i];
-
-                if (nir + green == 0)
-                {
-                    result[i] = 0;
-                }
-                else
-                {
-                    double val = (nir - green) / (nir + green);
-                    result[i] = double.IsFinite(val) ? Math.Clamp(val, -1.0, 1.0) : 0;
-                }
-            }
-
-            return (result, width, height);
-        }
-        finally
-        {
-            Gdal.Unlink(memPath);
-        }
+            if (nir + green == 0) return 0;
+            return (nir - green) / (nir + green);
+        });
     }
 
     /// <summary>
-    /// Funkcja przeliczająca SAVI (Soil Adjusted Vegetation Index)
+    /// Funkcja przeliczająca Savi (Soil Adjusted Vegetation Index)
     /// </summary>
     /// <param name="tiffBytes">Tablica bajtowa zawierająca potrzebne m.in. pasma</param>
-    /// <returns>Macierz liczb typu zmiennoprzecinkowego podwójnej precyzji, zawierająca SAVI wejściowego obrazu</returns>
+    /// <returns>Macierz liczb typu zmiennoprzecinkowego podwójnej precyzji, zawierająca Savi wejściowego obrazu</returns>
     /// <exception cref="Exception"></exception>
-    public static (double[] Data, int Width, int Height) CalculateSavi(byte[] tiffBytes)
+    public static (float[] Data, int Width, int Height) CalculateSavi(byte[] tiffBytes)
     {
-        Gdal.AllRegister();
-        string memPath = $"/vsimem/savi_calc_{Guid.NewGuid()}.tif";
-
-        try
+        return CalculateTwoBandIndex(tiffBytes, 2, 7, (green, nir) => 
         {
-            Gdal.FileFromMemBuffer(memPath, tiffBytes);
-            using var ds = Gdal.Open(memPath, Access.GA_ReadOnly);
-            if (ds == null) throw new Exception("Nie można otworzyć obrazu przez GDAL.");
-
-            int width = ds.RasterXSize;
-            int height = ds.RasterYSize;
-
-            using var bandRed = ds.GetRasterBand(3); // Kanał 3: B04 (Red)
-            using var bandNir = ds.GetRasterBand(7); // Kanał 7: B08 (NIR)
-
-            int[] redBuffer = new int[width * height];
-            int[] nirBuffer = new int[width * height];
-
-            bandRed.ReadRaster(0, 0, width, height, redBuffer, width, height, 0, 0);
-            bandNir.ReadRaster(0, 0, width, height, nirBuffer, width, height, 0, 0);
-
-            double[] result = new double[height * width];
-            double L = 0.5;
-
-            for (int i = 0; i < width * height; i++)
-            {
-                double red = redBuffer[i] / 10000.0;
-                double nir = nirBuffer[i] / 10000.0;
-
-                if (nir + red + L == 0)
-                {
-                    result[i] = 0;
-                }
-                else
-                {
-                    double val = ((nir - red) / (nir + red + L)) * (1.0 + L);
-                    result[i] = double.IsFinite(val) ? Math.Clamp(val, -1.0, 1.0) : 0;
-                }
-            }
-
-            return (result, width, height);
-        }
-        finally
-        {
-            Gdal.Unlink(memPath);
-        }
+            float L = 0.5f;
+            if (nir + green + L == 0) return 0;
+            return ((nir - green) / (nir + green + L)) * (1.0f + L);
+        });
     }
+
 
     /// <summary>
     /// Funkcja przeliczająca NDWI (Normalized Difference Water Index / NDMI)
@@ -180,10 +125,23 @@ public static class NdviUtils
     /// <param name="tiffBytes">Tablica bajtowa zawierająca potrzebne m.in. pasma</param>
     /// <returns>Macierz liczb typu zmiennoprzecinkowego podwójnej precyzji, zawierająca NDWI wejściowego obrazu</returns>
     /// <exception cref="Exception"></exception>
-    public static (double[] Data, int Width, int Height) CalculateNdwi(byte[] tiffBytes)
+    public static (float[] Data, int Width, int Height) CalculateNdwi(byte[] tiffBytes)
     {
-        Gdal.AllRegister();
-        string memPath = $"/vsimem/ndwi_calc_{Guid.NewGuid()}.tif";
+        return CalculateTwoBandIndex(tiffBytes, 7, 9, (nir, swir) => 
+        {
+            if (nir + swir == 0) return 0;
+            return (nir - swir) / (nir + swir);
+        });
+    }
+
+    private static (float[] Data, int Width, int Height) CalculateThreeBandIndex(
+    byte[] tiffBytes,
+    int band1Id,
+    int band2Id,
+    int band3Id,
+    Func<float, float, float, float> formula)
+    {
+        string memPath = $"/vsimem/index_calc_{Guid.NewGuid()}.tif";
 
         try
         {
@@ -194,32 +152,52 @@ public static class NdviUtils
             int width = ds.RasterXSize;
             int height = ds.RasterYSize;
 
-            using var bandNir = ds.GetRasterBand(7);  // Kanał 7: B08 (NIR)
-            using var bandSwir = ds.GetRasterBand(9); // Kanał 9: B11 (SWIR)
+            using var band1 = ds.GetRasterBand(band1Id);
+            using var band2 = ds.GetRasterBand(band2Id);
+            using var band3 = ds.GetRasterBand(band3Id);
 
-            int[] nirBuffer = new int[width * height];
-            int[] swirBuffer = new int[width * height];
+            float[] result = new float[height * width];
+            object gdalLock = new object();
 
-            bandNir.ReadRaster(0, 0, width, height, nirBuffer, width, height, 0, 0);
-            bandSwir.ReadRaster(0, 0, width, height, swirBuffer, width, height, 0, 0);
-
-            double[] result = new double[height * width];
-
-            for (int i = 0; i < width * height; i++)
+            Parallel.For(0, height, y =>
             {
-                double nir = nirBuffer[i];
-                double swir = swirBuffer[i];
+                // Wypożyczamy 3 tablice
+                short[] row1 = System.Buffers.ArrayPool<short>.Shared.Rent(width);
+                short[] row2 = System.Buffers.ArrayPool<short>.Shared.Rent(width);
+                short[] row3 = System.Buffers.ArrayPool<short>.Shared.Rent(width);
 
-                if (nir + swir == 0)
+                try
                 {
-                    result[i] = 0;
+                    lock (gdalLock)
+                    {
+                        band1.ReadRaster(0, y, width, 1, row1, width, 1, 0, 0);
+                        band2.ReadRaster(0, y, width, 1, row2, width, 1, 0, 0);
+                        band3.ReadRaster(0, y, width, 1, row3, width, 1, 0, 0);
+                    }
+
+                    for (int x = 0; x < width; x++)
+                    {
+                        // Normalizujemy wszystkie trzy kanały
+                        float val1 = (ushort)row1[x] / 10000.0f;
+                        float val2 = (ushort)row2[x] / 10000.0f;
+                        float val3 = (ushort)row3[x] / 10000.0f;
+
+                        int index = y * width + x;
+
+                        // WYZWOŁANIE DELEGATA (Kolejność musi się zgadzać z argumentami wywołania!)
+                        float calculatedValue = formula(val1, val2, val3);
+
+                        result[index] = float.IsFinite(calculatedValue) ? Math.Clamp(calculatedValue, -1.0f, 1.0f) : 0;
+                    }
                 }
-                else
+                finally
                 {
-                    double val = (nir - swir) / (nir + swir);
-                    result[i] = double.IsFinite(val) ? Math.Clamp(val, -1.0, 1.0) : 0;
+                    // Zwracamy wszystkie 3 tablice
+                    System.Buffers.ArrayPool<short>.Shared.Return(row1);
+                    System.Buffers.ArrayPool<short>.Shared.Return(row2);
+                    System.Buffers.ArrayPool<short>.Shared.Return(row3);
                 }
-            }
+            });
 
             return (result, width, height);
         }
@@ -228,6 +206,7 @@ public static class NdviUtils
             Gdal.Unlink(memPath);
         }
     }
+    
 
     /// <summary>
     /// Funkcja przeliczająca EVI (Enhanced Vegetation Index)
@@ -235,59 +214,21 @@ public static class NdviUtils
     /// <param name="tiffBytes">Tablica bajtowa zawierająca potrzebne m.in. pasma</param>
     /// <returns>Macierz liczb typu zmiennoprzecinkowego podwójnej precyzji, zawierająca EVI wejściowego obrazu</returns>
     /// <exception cref="Exception"></exception>
-    public static (double[] Data, int Width, int Height) CalculateEvi(byte[] tiffBytes)
+    public static (float[] Data, int Width, int Height) CalculateEvi(byte[] tiffBytes)
     {
-        Gdal.AllRegister();
-        string memPath = $"/vsimem/evi_calc_{Guid.NewGuid()}.tif";
-
-        try
+        // Pasma: 1 (Blue), 3 (Red), 7 (NIR)
+        return CalculateThreeBandIndex(tiffBytes, 1, 3, 7, (blue, red, nir) => 
         {
-            Gdal.FileFromMemBuffer(memPath, tiffBytes);
-            using var ds = Gdal.Open(memPath, Access.GA_ReadOnly);
-            if (ds == null) throw new Exception("Nie można otworzyć obrazu przez GDAL.");
+            // Mianownik wzoru EVI
+            float denominator = nir + (6.0f * red) - (7.5f * blue) + 1.0f;
 
-            int width = ds.RasterXSize;
-            int height = ds.RasterYSize;
-
-            using var bandBlue = ds.GetRasterBand(1); // Kanał 1: B02 (Blue)
-            using var bandRed = ds.GetRasterBand(3);  // Kanał 3: B04 (Red)
-            using var bandNir = ds.GetRasterBand(7);  // Kanał 7: B08 (NIR)
-
-            int[] blueBuffer = new int[width * height];
-            int[] redBuffer = new int[width * height];
-            int[] nirBuffer = new int[width * height];
-
-            bandBlue.ReadRaster(0, 0, width, height, blueBuffer, width, height, 0, 0);
-            bandRed.ReadRaster(0, 0, width, height, redBuffer, width, height, 0, 0);
-            bandNir.ReadRaster(0, 0, width, height, nirBuffer, width, height, 0, 0);
-
-            double[] result = new double[height * width];
-
-            for (int i = 0; i < width * height; i++)
+            if (denominator == 0f) 
             {
-                double blue = blueBuffer[i] / 10000.0;
-                double red = redBuffer[i] / 10000.0;
-                double nir = nirBuffer[i] / 10000.0;
-
-                double denominator = nir + (6.0 * red) - (7.5 * blue) + 1.0;
-
-                if (denominator == 0)
-                {
-                    result[i] = 0;
-                }
-                else
-                {
-                    double val = 2.5 * ((nir - red) / denominator);
-                    result[i] = double.IsFinite(val) ? Math.Clamp(val, -1.0, 1.0) : 0;
-                }
+                return 0f;
             }
 
-            return (result, width, height);
-        }
-        finally
-        {
-            Gdal.Unlink(memPath);
-        }
+            return 2.5f * ((nir - red) / denominator);
+        });
     }
     #endregion
 }

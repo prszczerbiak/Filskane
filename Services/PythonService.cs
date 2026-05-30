@@ -13,7 +13,7 @@ public class PythonService
     private readonly IConfiguration _configuration;
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
 
-    private static double[][] ToJaggedMatrix(double[] values, int matrixWidth, int matrixHeight, string name)
+    private static double[][] ToJaggedMatrix(float[] values, int matrixWidth, int matrixHeight, string name)
     {
         if (matrixWidth <= 0 || matrixHeight <= 0)
         {
@@ -51,18 +51,18 @@ public class PythonService
     }
 
     public MultiIndexGroupingResultDto RunMultiIndexGrouping(
-        double[] ndvi,
-        double[] gndvi,
-        double[] ndwi,
+        float[] ndvi,
+        float[] gndvi,
+        float[] ndwi,
         int matrixWidth,
         int matrixHeight,
         double[][] fieldPoints,
-        double ndviMin,
-        double ndviMax,
-        double gndviMin,
-        double gndviMax,
-        double ndwiMin,
-        double ndwiMax)
+        float ndviMin,
+        float ndviMax,
+        float gndviMin,
+        float gndviMax,
+        float ndwiMin,
+        float ndwiMax)
     {
         double eps = _configuration.GetValue<double>("AlgorithmSettings:Eps", 2.0);
         int minSamples = _configuration.GetValue<int>("AlgorithmSettings:MinSamples", 3);
@@ -132,7 +132,7 @@ public class PythonService
     /// 2. Słownik średnich wartości NDVI dla każdego klastra.
     /// </returns>
     /// <exception cref="InvalidOperationException">Rzucany, gdy wystąpi błąd po stronie skryptu Python.</exception>
-    public (int[] ClusterIds, Dictionary<string, double> NdviMedians) RunDbscan(double[][] points, double[] ndviValues)
+    public (int[] ClusterIds, Dictionary<string, double> NdviMedians) RunDbscan(double[][] points, float[] ndviValues)
     {
         if (points.Length == 0) return (Array.Empty<int>(), new Dictionary<string, double>());
 

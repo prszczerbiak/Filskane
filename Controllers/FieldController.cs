@@ -508,7 +508,7 @@ public class FieldController : ControllerBase
         }
     }
 
-    private static bool TryNormalizeIndexDimensions(double[] indexMatrix, int matrixWidth, int matrixHeight, out int width, out int height, out string error)
+    private static bool TryNormalizeIndexDimensions(float[] indexMatrix, int matrixWidth, int matrixHeight, out int width, out int height, out string error)
     {
         width = matrixWidth;
         height = matrixHeight;

@@ -12,7 +12,7 @@ public static class PlotUtils
     /// </summary>
     /// <param name="vegetationMatrix"></param>
     /// <returns>Tablica bajtowa zawierająca mapę ciepła w formacie png</returns>
-    public static byte[] RenderVegetationHeatmap(ReadOnlySpan<double> vegetationArray, int width, int height)
+    public static byte[] RenderVegetationHeatmap(ReadOnlySpan<float> vegetationArray, int width, int height)
     {
         double[,] vegetationMatrix = ToHeatmapMatrix(vegetationArray, width, height);
 
@@ -33,7 +33,7 @@ public static class PlotUtils
         return plot.GetImageBytes(width * 6, height * 6, ImageFormat.Png);
     }
 
-    public static byte[] RenderNDWIHeatmap(ReadOnlySpan<double> ndwiArray, int width, int height)
+    public static byte[] RenderNDWIHeatmap(ReadOnlySpan<float> ndwiArray, int width, int height)
     {
         double[,] ndwiMatrix = ToHeatmapMatrix(ndwiArray, width, height);
 
@@ -56,7 +56,7 @@ public static class PlotUtils
     #endregion
 
     #region Private Methods
-    private static double[,] ToHeatmapMatrix(ReadOnlySpan<double> values, int width, int height)
+    private static double[,] ToHeatmapMatrix(ReadOnlySpan<float> values, int width, int height)
     {
         if (width <= 0 || height <= 0)
             throw new ArgumentOutOfRangeException(nameof(width), "Wymiary macierzy muszą być większe od zera.");
@@ -70,8 +70,8 @@ public static class PlotUtils
             int rowOffset = y * width;
             for (int x = 0; x < width; x++)
             {
-                double value = values[rowOffset + x];
-                matrix[y, x] = double.IsFinite(value) ? value : 0d;
+                float value = values[rowOffset + x];
+                matrix[y, x] = float.IsFinite(value) ? value : 0d;
             }
         }
 

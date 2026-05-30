@@ -61,7 +61,7 @@ namespace Filskane.Models
     /// Zawiera surowe dane numeryczne NDVI w formie macierzy oraz BBox pola.
     /// </summary>
     public record NdviDataDto(
-        double[] Ndvi,
+        float[] Ndvi,
         int MatrixWidth,
         int MatrixHeight,
         Bbox? FieldBbox
@@ -91,7 +91,7 @@ namespace Filskane.Models
     /// <param name="FieldGeoJson">Opcjonalna geometria pola w formacie GeoJSON.</param>
     /// <param name="Bbox">Opcjonalne granice obrazu.</param>
     public record IndexVisualizationDto(
-        double[] IndexMatrix,
+        float[] IndexMatrix,
         int MatrixWidth,
         int MatrixHeight,
         JsonElement FieldGeoJson,
@@ -131,7 +131,7 @@ namespace Filskane.Models
     {
         public int PlantId { get; init; }
         public int CycleId { get; init; }
-        public double[] VegetationIndex { get; init; } = [];
+        public float[] VegetationIndex { get; init; } = [];
         public int MatrixWidth { get; init; }
         public int MatrixHeight { get; init; }
         public string AnalysisType { get; init; } = "NDVI";

@@ -92,12 +92,12 @@ public class AnalysisService
             width,
             height,
             fieldPixelsForGrouping,
-            ndviThreshold?.MinNdvi ?? 0.2,
-            ndviThreshold?.MaxNdvi ?? 0.6,
-            gndviThreshold?.MinNdvi ?? 0.2,
-            gndviThreshold?.MaxNdvi ?? 0.6,
-            ndwiThreshold?.MinNdvi ?? 0.2,
-            ndwiThreshold?.MaxNdvi ?? 0.6
+            (float)(ndviThreshold?.MinNdvi ?? 0.2),
+            (float)(ndviThreshold?.MaxNdvi ?? 0.6),
+            (float)(gndviThreshold?.MinNdvi ?? 0.2),
+            (float)(gndviThreshold?.MaxNdvi ?? 0.6),
+            (float)(ndwiThreshold?.MinNdvi ?? 0.2),
+            (float)(ndwiThreshold?.MaxNdvi ?? 0.6)
         );
 
         var classMatrix = groupingResult.CombinedClasses;
@@ -174,7 +174,7 @@ public class AnalysisService
         string username,
         int fieldId,
         int? scanId,
-        Func<byte[], (double[] Data, int Width, int Height)> calculator)
+        Func<byte[], (float[] Data, int Width, int Height)> calculator)
     {
         ScanResultDto? scan = scanId.HasValue
             ? await _scanDal.GetScanByIdAsync(username, scanId.Value)
@@ -195,7 +195,7 @@ public class AnalysisService
     /// <returns>Obraz PNG z wizualizacją NDVI.</returns>
     public byte[] RenderIndexVisualization(IndexVisualizationDto dto)
     {
-        var indexArray = dto.IndexMatrix ?? Array.Empty<double>();
+        var indexArray = dto.IndexMatrix ?? Array.Empty<float>();
         int width = dto.MatrixWidth;
         int height = dto.MatrixHeight;
 
@@ -217,7 +217,7 @@ public class AnalysisService
         return indexMap;
     }
 
-    private static bool TryNormalizeIndexDimensions(double[] indexArray, ref int width, ref int height)
+    private static bool TryNormalizeIndexDimensions(float[] indexArray, ref int width, ref int height)
     {
         if (indexArray.Length == 0)
             return false;
@@ -266,11 +266,11 @@ public class AnalysisService
             : request.AnalysisType.Trim().ToUpperInvariant();
 
         var threshold = await _fieldDal.GetThresholdAsync(request.PlantId, request.CycleId, analysisType);
-        double minT = threshold?.MinNdvi ?? 0.2;
-        double maxT = threshold?.MaxNdvi ?? 0.6;
+        float minT = (float)(threshold?.MinNdvi ?? 0.2);
+        float maxT = (float)(threshold?.MaxNdvi ?? 0.6);
         Console.WriteLine($"Using thresholds for {analysisType} - Min: {minT}, Max: {maxT}");
 
-        double[] ndviMatrix = request.VegetationIndex;
+        float[] ndviMatrix = request.VegetationIndex;
         int width = request.MatrixWidth;
         int height = request.MatrixHeight;
 
