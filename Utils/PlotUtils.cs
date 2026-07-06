@@ -1,4 +1,5 @@
-﻿using ScottPlot;
+﻿using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace Filskane.Utils;
 /// <summary>
@@ -12,25 +13,54 @@ public static class PlotUtils
     /// </summary>
     /// <param name="vegetationMatrix"></param>
     /// <returns>Tablica bajtowa zawierająca mapę ciepła w formacie png</returns>
-    public static byte[] RenderVegetationHeatmap(ReadOnlySpan<float> vegetationArray, int width, int height)
+    public static unsafe byte[] RenderVegetationHeatmap(ReadOnlySpan<float> vegetationArray, int width, int height)
     {
-        double[,] vegetationMatrix = ToHeatmapMatrix(vegetationArray, width, height);
+        const int scale = 6;
+        int outputWidth = width * scale;
+        int outputHeight = height * scale;
 
-        ScottPlot.Plot plot = new();
+        using var image = new Image<Rgba32>(outputWidth, outputHeight);
 
-        plot.Layout.Fixed(new PixelPadding(0, 0, 0, 0));
+        if (image.DangerousTryGetSinglePixelMemory(out Memory<Rgba32> imageMemory))
+        {
+            fixed (float* ptr = vegetationArray)
+            {
+                nint address = (nint)ptr;
+                var parallelOptions = new ParallelOptions
+                {
+                    MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2)
+                };
 
-        var hm = plot.Add.Heatmap(vegetationMatrix);
+                // Lambda jest teraz w 100% bezpieczna kompilacyjnie
+                Parallel.For(0, outputHeight, parallelOptions, y =>
+                {
+                    float* vegetationPtr = (float*)address;
 
-        hm.Colormap = new ScottPlot.Colormaps.Greens().Reversed();
+                    // 2. Wewnątrz wątku bierzemy całą pamięć obrazka, robimy z niej Spana, 
+                    // i wycinamy (Slice) tylko ten jeden, unikalny dla tego wątku wiersz!
+                    Span<Rgba32> pixelRow = imageMemory.Span.Slice(y * outputWidth, outputWidth);
 
-        hm.ManualRange = new ScottPlot.Range(0, 1);
+                    int inputY = y / scale;
 
-        plot.Axes.Frameless();
-        plot.Grid.IsVisible = false;
-        plot.Axes.Margins(0, 0);
+                    for (int x = 0; x < outputWidth; x++)
+                    {
+                        int inputX = x / scale;
+                        int dataIndex = (inputY * width) + inputX;
 
-        return plot.GetImageBytes(width * 6, height * 6, ImageFormat.Png);
+                        float value = vegetationPtr[dataIndex];
+                        byte greenComponent = (byte)(255 - (value * 155));
+                        byte redBlueComponent = (byte)((1 - value) * 240);
+
+                        pixelRow[x] = new Rgba32(redBlueComponent, greenComponent, redBlueComponent, 255);
+                    }
+                });
+            }
+        }
+
+        int maxEstimatedSize = outputWidth * outputHeight * 4;
+        using var ms = new MemoryStream(maxEstimatedSize);
+        image.SaveAsPng(ms);
+        return ms.ToArray();
     }
 
     public static byte[] RenderNDWIHeatmap(ReadOnlySpan<float> ndwiArray, int width, int height)
