@@ -14,7 +14,36 @@ public static class PlotUtils
     /// </summary>
     /// <param name="vegetationMatrix"></param>
     /// <returns>Tablica bajtowa zawierająca mapę ciepła w formacie png</returns>
-    public static unsafe byte[] RenderVegetationHeatmap(ReadOnlySpan<float> vegetationArray, int width, int height)
+    public static unsafe byte[] RenderVegetationHeatmap(ReadOnlySpan<float> array, int w, int h)
+    {
+        return RenderHeatmapCore(array, w, h, &GetVegetationColor);
+    }
+
+    public static unsafe byte[] RenderNDWIHeatmapFast(ReadOnlySpan<float> array, int w, int h)
+    {
+        return RenderHeatmapCore(array, w, h, &GetNDWIColor);
+    }
+    #endregion
+
+    #region Private Methods
+
+    private static Rgba32 GetVegetationColor(float value)
+    {
+        byte greenComponent = (byte)(255 - (value * 155));
+        byte redBlueComponent = (byte)((1 - value) * 240);
+        return new Rgba32(redBlueComponent, greenComponent, redBlueComponent, 255);
+    }
+
+    private static Rgba32 GetNDWIColor(float value)
+    {
+        value = float.IsFinite(value) ? Math.Clamp(value, 0f, 1f) : 0f;
+        byte r = (byte)(255 * (1 - value));
+        byte g = (byte)(255 * (1 - value));
+        return new Rgba32(r, g, 255, 255);
+    }
+
+    // 2. Nasz uniwersalny silnik przyjmujący wskaźnik na funkcję (delegate*<float, Rgba32>)
+    private static unsafe byte[] RenderHeatmapCore(ReadOnlySpan<float> dataArray, int width, int height, delegate*<float, Rgba32> colorCalculator)
     {
         const int scale = 6;
         int outputWidth = width * scale;
@@ -24,7 +53,7 @@ public static class PlotUtils
 
         if (image.DangerousTryGetSinglePixelMemory(out Memory<Rgba32> imageMemory))
         {
-            fixed (float* ptr = vegetationArray)
+            fixed (float* ptr = dataArray)
             {
                 nint address = (nint)ptr;
                 var parallelOptions = new ParallelOptions
@@ -32,81 +61,34 @@ public static class PlotUtils
                     MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2)
                 };
 
-                // Lambda jest teraz w 100% bezpieczna kompilacyjnie
-                Parallel.For(0, outputHeight, parallelOptions, y =>
+                Parallel.For(0, height, parallelOptions, inputY =>
                 {
-                    float* vegetationPtr = (float*)address;
+                    float* dataPtr = (float*)address;
+                    int rowOffset = inputY * width;
+                    int outputYStart = inputY * scale;
+                    int baseRowIndex = outputYStart * outputWidth;
 
-                    // 2. Wewnątrz wątku bierzemy całą pamięć obrazka, robimy z niej Spana, 
-                    // i wycinamy (Slice) tylko ten jeden, unikalny dla tego wątku wiersz!
-                    Span<Rgba32> pixelRow = imageMemory.Span.Slice(y * outputWidth, outputWidth);
-
-                    int inputY = y / scale;
-
-                    for (int x = 0; x < outputWidth; x++)
+                    for (int inputX = 0; inputX < width; inputX++)
                     {
-                        int inputX = x / scale;
-                        int dataIndex = (inputY * width) + inputX;
+                        float value = dataPtr[rowOffset + inputX];
 
-                        float value = vegetationPtr[dataIndex];
-                        byte greenComponent = (byte)(255 - (value * 155));
-                        byte redBlueComponent = (byte)((1 - value) * 240);
+                        // WYWOŁANIE PRZEZ WSKAŹNIK - Błyskawiczne i bez alokacji!
+                        Rgba32 color = colorCalculator(value);
 
-                        pixelRow[x] = new Rgba32(redBlueComponent, greenComponent, redBlueComponent, 255);
+                        int outputXStart = inputX * scale;
+                        for (int sy = 0; sy < scale; sy++)
+                        {
+                            Span<Rgba32> pixelRow = imageMemory.Span.Slice(baseRowIndex + (sy * outputWidth), outputWidth);
+                            pixelRow.Slice(outputXStart, scale).Fill(color);
+                        }
                     }
                 });
             }
         }
 
-        int maxEstimatedSize = outputWidth * outputHeight * 4;
-        using var ms = new MemoryStream(maxEstimatedSize);
+        using var ms = new MemoryStream(width * height);
         image.SaveAsPng(ms);
         return ms.ToArray();
-    }
-
-    public static byte[] RenderNDWIHeatmap(ReadOnlySpan<float> ndwiArray, int width, int height)
-    {
-        double[,] ndwiMatrix = ToHeatmapMatrix(ndwiArray, width, height);
-
-        ScottPlot.Plot plot = new();
-
-        plot.Layout.Fixed(new PixelPadding(0, 0, 0, 0));
-
-        var hm = plot.Add.Heatmap(ndwiMatrix);
-
-        hm.Colormap = new ScottPlot.Colormaps.Blues().Reversed();
-
-        hm.ManualRange = new ScottPlot.Range(0, 1);
-
-        plot.Axes.Frameless();
-        plot.Grid.IsVisible = false;
-        plot.Axes.Margins(0, 0);
-
-        return plot.GetImageBytes(width * 6, height * 6, ImageFormat.Png);
-    }
-    #endregion
-
-    #region Private Methods
-    private static double[,] ToHeatmapMatrix(ReadOnlySpan<float> values, int width, int height)
-    {
-        if (width <= 0 || height <= 0)
-            throw new ArgumentOutOfRangeException(nameof(width), "Wymiary macierzy muszą być większe od zera.");
-
-        if (values.Length != width * height)
-            throw new ArgumentException("Długość danych nie odpowiada podanym wymiarom macierzy.");
-
-        double[,] matrix = new double[height, width];
-        for (int y = 0; y < height; y++)
-        {
-            int rowOffset = y * width;
-            for (int x = 0; x < width; x++)
-            {
-                float value = values[rowOffset + x];
-                matrix[y, x] = float.IsFinite(value) ? value : 0d;
-            }
-        }
-
-        return matrix;
     }
 
     #endregion
