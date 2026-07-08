@@ -19,7 +19,7 @@ public static class PlotUtils
         return RenderHeatmapCore(array, w, h, &GetVegetationColor);
     }
 
-    public static unsafe byte[] RenderNDWIHeatmapFast(ReadOnlySpan<float> array, int w, int h)
+    public static unsafe byte[] RenderNDWIHeatmap(ReadOnlySpan<float> array, int w, int h)
     {
         return RenderHeatmapCore(array, w, h, &GetNDWIColor);
     }
