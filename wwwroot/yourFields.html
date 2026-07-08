@@ -5,11 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Twoje pola Filskane</title>
     <link rel="stylesheet" href="css/yourFieldsStyle.css">
+    <link rel="stylesheet" href="css/accountMenu.css">
 
 </head>
 <body>
     <div class="content">
-        <h2 class="title">Wybierz pole:</h2>
+        <div class="account-menu-container">
+            <h2 class="title">Wybierz pole:</h2>
+
+            <div class="account-menu" id="accountMenu">
+                <button type="button" id="accountMenuToggle" class="account-menu-toggle" aria-expanded="false" aria-controls="accountDropdown">
+                    <span class="account-icon" aria-hidden="true"></span>
+                    <span>Moje Konto</span>
+                </button>
+                <div class="account-dropdown" id="accountDropdown">
+                    <a href="yourprofile.html">Mój Profil</a>
+                    <button type="button" id="logoutBtn">Wyloguj się</button>
+                </div>
+            </div>
+        </div>
         <div id="fields-container">
 
         </div>
@@ -20,5 +34,6 @@
     </footer>
 
     <script src="js/yourFields.js"></script>
+    <script src="js/accountMenu.js"></script>
 </body>
 </html>

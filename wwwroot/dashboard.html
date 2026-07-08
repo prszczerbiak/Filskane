@@ -5,14 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Twój Filskane</title>
     <link rel="stylesheet" href="css/dashboardStyle.css">
+    <link rel="stylesheet" href="css/accountMenu.css">
     
 </head>
 <body>
     <div class="content">
-        <button id="logoutBtn">Wyloguj się</button>
+        <div class="account-menu-container">
+            <h2 id="welcome">Witaj, 😊</h2>
 
-        <h2 id="welcome">Witaj, 😊</h2>
-        <br>
+            <div class="account-menu" id="accountMenu">
+                <button type="button" id="accountMenuToggle" class="account-menu-toggle" aria-expanded="false" aria-controls="accountDropdown">
+                    <span class="account-icon" aria-hidden="true"></span>
+                    <span>Moje Konto</span>
+                </button>
+                <div class="account-dropdown" id="accountDropdown">
+                    <a href="yourprofile.html">Mój Profil</a>
+                    <button type="button" id="logoutBtn">Wyloguj się</button>
+                </div>
+            </div>
+        </div>
         <div class="tile-grid">
             <a href="yourFarm.html">
                 <div class="tile tile1">Twoje gospodarstwo</div>
@@ -35,5 +46,6 @@
     </footer>
 
     <script src="js/dashboard.js"></script>
+    <script src="js/accountMenu.js"></script>
 </body>
 </html>

@@ -39,12 +39,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const CONFIG = {
         apiBase: "https://localhost:7273/api",
         endpoints: { shortInfo: "/settings/getShortInfo" },
-        selectors: { welcomeMsg: "welcome", logoutBtn: "logoutBtn" }
+        selectors: { welcomeMsg: "welcome" }
     };
 
     const ui = {
         welcome: document.getElementById(CONFIG.selectors.welcomeMsg),
-        logoutBtn: document.getElementById(CONFIG.selectors.logoutBtn),
         tileGrid: document.querySelector('.tile-grid')
     };
 
@@ -168,8 +167,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    if (ui.logoutBtn) ui.logoutBtn.addEventListener('click', handleLogout);
-
     function renderAgroOrganizationDashboard(user) {
         if (ui.welcome) {
             ui.welcome.remove();
@@ -191,10 +188,6 @@ document.addEventListener("DOMContentLoaded", () => {
             loadPendingReports();
         }
 
-        if (ui.logoutBtn) {
-            ui.logoutBtn.style.position = 'static';
-            ui.logoutBtn.style.margin = '0 0 20px auto';
-        }
     }
 
     async function loadPendingReports() {
