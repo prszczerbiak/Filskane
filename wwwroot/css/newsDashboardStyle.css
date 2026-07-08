@@ -153,6 +153,66 @@ footer {
     border-radius: 10px;
 }
 
+.news-tabs {
+    display: flex;
+    gap: 10px;
+    margin: 10px 0 15px;
+}
+
+.news-tab {
+    padding: 8px 14px;
+    border: 1px solid #4CAF50;
+    background: white;
+    color: #2e7d32;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.news-tab.active {
+    background: #4CAF50;
+    color: white;
+}
+
+.news-tab-panel {
+    text-align: left;
+}
+
+.reports-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.report-item {
+    padding: 12px;
+    border-radius: 10px;
+    background: #fff;
+    border: 1px solid #d8d8d8;
+}
+
+.report-title {
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.report-meta {
+    font-size: 13px;
+    color: #666;
+}
+
+.report-status {
+    margin-top: 8px;
+    font-weight: bold;
+}
+
+.report-status.validated {
+    color: #2e7d32;
+}
+
+.report-status.pending {
+    color: #c62828;
+}
+
 /* Prawa kolumna: kalendarz + ceny */
 .right-section {
     flex: 1;
@@ -186,6 +246,43 @@ footer {
 .dark-theme .news-section {
     background-color: #383a3f; /* ciemniejszy szary, kontrastujący z tłem */
     color: #e5e5e5; /* jasny tekst */
+}
+
+.dark-theme .news-tab {
+    background: #2f3237;
+    color: #cfe8d1;
+    border-color: #4CAF50;
+}
+
+.dark-theme .news-tab.active {
+    background: #4CAF50;
+    color: #ffffff;
+}
+
+.dark-theme .report-item {
+    background: #2a2b2e;
+    border-color: #4b4d52;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+}
+
+.dark-theme .report-title {
+    color: #ffffff;
+}
+
+.dark-theme .report-meta {
+    color: #c0c4ca;
+}
+
+.dark-theme .report-status.validated {
+    color: #7ee081;
+}
+
+.dark-theme .report-status.pending {
+    color: #ff8a80;
+}
+
+.dark-theme .report-status.rejected {
+    color: #ffb3b1;
 }
 
 .dark-theme .calendar-section {

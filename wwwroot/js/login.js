@@ -61,7 +61,8 @@
             const cleanUserInfo = {
                 name: apiData.name || apiData.firstName || credentials.username,
                 farmX: apiData.farmX, // Longitude (Długość)
-                farmY: apiData.farmY  // Latitude (Szerokość)
+                farmY: apiData.farmY,  // Latitude (Szerokość)
+                accountType: apiData.accountType || apiData.account_type || 'USER'
             };
 
             localStorage.setItem("userInfo", JSON.stringify(cleanUserInfo));

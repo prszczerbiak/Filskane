@@ -135,4 +135,67 @@ async function loadWeather() {
     }
 }
 
+async function loadUserReports() {
+    const list = document.getElementById("userReportsList");
+    if (!list) return;
+
+    list.innerHTML = "<p>Ładowanie raportów...</p>";
+
+    try {
+        const token = localStorage.getItem("token");
+        const res = await fetch("https://localhost:7273/api/field/reports", {
+            method: "GET",
+            headers: { "Authorization": "Bearer " + token }
+        });
+
+        if (!res.ok) throw new Error("Nie udało się pobrać raportów");
+
+        const reports = await res.json();
+        if (!reports || reports.length === 0) {
+            list.innerHTML = "<p>Brak raportów do wyświetlenia.</p>";
+            return;
+        }
+
+        list.innerHTML = reports.map(r => `
+            <div class="report-item">
+                <div class="report-title">Pole: ${r.fieldName || 'Nieznane pole'}</div>
+                <div class="report-meta">ID raportu: ${r.reportId}</div>
+                <div class="report-meta">Data: ${r.generatedAt ? new Date(r.generatedAt).toLocaleString('pl-PL') : 'Brak danych'}</div>
+                <div class="report-status ${`status-${(r.validation || 'pending').toLowerCase()}`}">
+                    ${r.validation === 'confirmed' ? 'Zatwierdzony' : (r.validation === 'rejected' ? 'Odrzucony' : 'Oczekuje na walidację')}
+                </div>
+            </div>
+        `).join('');
+    } catch (err) {
+        list.innerHTML = `<p>Błąd pobierania raportów: ${err.message}</p>`;
+    }
+}
+
+function setupNewsTabs() {
+    const tabs = document.querySelectorAll('.news-tab');
+    const panels = {
+        agroNews: document.getElementById('agroNewsPanel'),
+        userReports: document.getElementById('userReportsPanel')
+    };
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', async () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            Object.values(panels).forEach(panel => {
+                if (panel) panel.style.display = 'none';
+            });
+
+            const target = tab.getAttribute('data-tab');
+            if (target === 'agroNews' && panels.agroNews) panels.agroNews.style.display = 'block';
+            if (target === 'userReports' && panels.userReports) {
+                panels.userReports.style.display = 'block';
+                await loadUserReports();
+            }
+        });
+    });
+}
+
+setupNewsTabs();
 loadWeather();

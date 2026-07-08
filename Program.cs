@@ -58,6 +58,7 @@ builder.Services.AddScoped<FieldDAL>();
 builder.Services.AddScoped<ScanDAL>();
 builder.Services.AddScoped<SettingsDAL>();
 builder.Services.AddScoped<VehicleDAL>();
+builder.Services.AddScoped<ReportDAL>();
 
 // --- Warstwa Logiki Biznesowej (Services) ---
 builder.Services.AddScoped<AuthService>();
@@ -92,6 +93,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)) // ! dla null-safety w .NET 10
         };
     });
+
+PdfSharp.Fonts.GlobalFontSettings.FontResolver = new Filskane.Utils.CustomFontResolver();
 
 builder.Services.AddAuthorization();
 

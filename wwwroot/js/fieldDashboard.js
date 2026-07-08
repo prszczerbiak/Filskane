@@ -86,6 +86,7 @@ document.addEventListener("DOMContentLoaded", () => {
         overallAnalysisImage: document.getElementById('overallAnalysisImage'),
         overallAnalysisNoData: document.getElementById('overallAnalysisNoData'),
         overallAnalysisLegend: document.getElementById('overallAnalysisLegend'),
+        btnGenerateOverallAnalysisReport: document.getElementById('generateOverallAnalysisReportBtn'),
 
         // Przyciski i Kontrolki
         btnImport: document.getElementById('importBtn'),
@@ -110,6 +111,15 @@ document.addEventListener("DOMContentLoaded", () => {
         if (savedTheme === 'dark') {
             document.documentElement.classList.add('dark-theme');
         }
+        if (UI.imgColorbar) {
+            UI.imgColorbar.src = (savedTheme === 'dark') ? 'css/colorbarDark.png' : 'css/colorbar.png';
+        }
+
+        if (STATE.fieldData && STATE.fieldData.area) {
+            UI.area.textContent = formatArea(STATE.fieldData.area);
+        }
+
+    }
 
     async function showOverallAnalysis() {
         openModal(UI.modalOverallAnalysis);
@@ -148,14 +158,65 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-        if (UI.imgColorbar) {
-            UI.imgColorbar.src = (savedTheme === 'dark') ? 'css/colorbarDark.png' : 'css/colorbar.png';
+    async function sendOverallAnalysisReport() {
+        if (UI.btnGenerateOverallAnalysisReport) {
+            UI.btnGenerateOverallAnalysisReport.disabled = true;
         }
 
-        if (STATE.fieldData && STATE.fieldData.area) {
-            UI.area.textContent = formatArea(STATE.fieldData.area);
+        try {
+            const res = await apiCall(`/overallAnalysisReport/send/${CONFIG.FIELD_ID}`, 'POST', {
+                geojson: STATE.fieldData.geojson
+            });
+
+            if (!res || !res.ok) throw new Error(await res.text());
+
+            const result = await res.json();
+            alert('Raport został wysłany.');
+        } catch (err) {
+            alert('Błąd wysyłania raportu: ' + err.message);
+        } finally {
+            if (UI.btnGenerateOverallAnalysisReport) {
+                UI.btnGenerateOverallAnalysisReport.disabled = false;
+            }
         }
     }
+
+    async function downloadOverallAnalysisReport() {
+        if (UI.btnGenerateOverallAnalysisReport) {
+            UI.btnGenerateOverallAnalysisReport.disabled = true;
+        }
+
+        try {
+            const res = await apiCall(`/overallAnalysisReport/${CONFIG.FIELD_ID}`, 'POST', {
+                geojson: STATE.fieldData.geojson
+            });
+
+            if (res && res.status === 204) {
+                alert('Brak danych do wygenerowania raportu.');
+                return;
+            }
+
+            if (!res || !res.ok) throw new Error(await res.text());
+
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `raport-analizy-pola-${CONFIG.FIELD_ID}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert('Błąd generowania raportu: ' + err.message);
+        } finally {
+            if (UI.btnGenerateOverallAnalysisReport) {
+                UI.btnGenerateOverallAnalysisReport.disabled = false;
+            }
+        }
+    }
+
+        
 
     async function updateField(payload) {
         try {
@@ -689,6 +750,16 @@ document.addEventListener("DOMContentLoaded", () => {
             showOverallAnalysis();
             if (UI.analysisDropdown) UI.analysisDropdown.style.display = 'none';
         });
+    }
+
+    if (UI.btnGenerateOverallAnalysisReport) {
+        UI.btnGenerateOverallAnalysisReport.addEventListener('click', async () => {
+            await sendOverallAnalysisReport();
+        });
+    }
+
+    if (UI.btnGenerateOverallAnalysisReport) {
+        UI.btnGenerateOverallAnalysisReport.addEventListener('click', downloadOverallAnalysisReport);
     }
 
     // Przyciski Akcji

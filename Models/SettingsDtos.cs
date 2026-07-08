@@ -43,7 +43,8 @@ public record UserShortDto(
     int DarkMode,
     int Surface,
     double? FarmX,
-    double? FarmY
+    double? FarmY,
+    string AccountType
 );
 
 /// <summary>

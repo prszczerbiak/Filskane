@@ -95,6 +95,131 @@ public class FieldController : ControllerBase
         }
     }
 
+    [HttpPost("overallAnalysisReport/{fieldId}")]
+    public async Task<IActionResult> GetOverallAnalysisReport(int fieldId, [FromBody] ScanRequestDto request)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        try
+        {
+            var pdfBytes = await _analysisService.GenerateOverallAnalysisReportAsync(username, fieldId, request.Geojson);
+            var fileName = $"raport-analizy-pola-{fieldId}-{DateTime.Now:yyyyMMdd-HHmm}.pdf";
+            return File(pdfBytes, "application/pdf", fileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd generowania raportu analizy dla pola {FieldId}", fieldId);
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpPost("overallAnalysisReport/send/{fieldId}")]
+    public async Task<IActionResult> SendOverallAnalysisReport(int fieldId, [FromBody] ScanRequestDto request)
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        try
+        {
+            const string validationEmail = "mrocznykominaj1@gmail.com";
+            await _analysisService.SendOverallAnalysisReportAsync(username, fieldId, request.Geojson, validationEmail);
+            return Ok(new { message = $"Raport został wysłany na {validationEmail}." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd wysyłania raportu analizy dla pola {FieldId}", fieldId);
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpGet("overallAnalysisReport/validate/{reportId}")]
+    public async Task<IActionResult> ValidateOverallAnalysisReport(int reportId)
+    {
+        try
+        {
+            var updated = await _analysisService.ValidateOverallAnalysisReportAsync(reportId);
+            if (!updated)
+                return NotFound(new { error = "Nie znaleziono raportu." });
+
+            return Ok(new { message = "Raport został zwalidowany." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd walidacji raportu {ReportId}", reportId);
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpGet("overallAnalysisReport/reject/{reportId}")]
+    public async Task<IActionResult> RejectOverallAnalysisReport(int reportId)
+    {
+        try
+        {
+            var updated = await _analysisService.RejectOverallAnalysisReportAsync(reportId);
+            if (!updated)
+                return NotFound(new { error = "Nie znaleziono raportu." });
+
+            return Ok(new { message = "Raport został odrzucony." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd odrzucania raportu {ReportId}", reportId);
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpGet("reports")]
+    public async Task<IActionResult> GetUserReports()
+    {
+        var username = GetCurrentUsername();
+        if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+        try
+        {
+            var reports = await _analysisService.GetUserReportsAsync(username);
+            return Ok(reports);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd pobierania raportów użytkownika {Username}", username);
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpGet("pending-reports")]
+    public async Task<IActionResult> GetPendingReports()
+    {
+        try
+        {
+            var reports = await _analysisService.GetPendingReportsAsync();
+            return Ok(reports);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd pobierania niezatwierdzonych raportów");
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpGet("report/{reportId}")]
+    public async Task<IActionResult> DownloadReport(int reportId)
+    {
+        try
+        {
+            var pdfBytes = await _analysisService.GetReportPdfAsync(reportId);
+            if (pdfBytes == null)
+                return NotFound(new { error = "Nie znaleziono raportu." });
+
+            return File(pdfBytes, "application/pdf", $"raport-{reportId}.pdf");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Błąd pobierania raportu {ReportId}", reportId);
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
     /// <summary>
     /// Aktualizuje dane podstawowe pola (np. nazwa, typ uprawy).
     /// </summary>

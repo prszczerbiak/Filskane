@@ -25,7 +25,18 @@
             <!-- Lewa kolumna: aktualności -->
             <div class="news-section">
                 <h4>Aktualności rolnicze</h4>
-                <p>Tu pojawią się aktualności rolnicze...</p>
+                <div class="news-tabs">
+                    <button class="news-tab active" data-tab="agroNews">Aktualności</button>
+                    <button class="news-tab" data-tab="userReports">Moje raporty</button>
+                </div>
+                <div class="news-tab-panel active" id="agroNewsPanel">
+                    <p>Tu pojawią się aktualności rolnicze...</p>
+                </div>
+                <div class="news-tab-panel" id="userReportsPanel" style="display:none;">
+                    <div id="userReportsList" class="reports-list">
+                        <p>Ładowanie raportów...</p>
+                    </div>
+                </div>
             </div>
 
             <!-- Prawa kolumna: kalendarz + ceny -->

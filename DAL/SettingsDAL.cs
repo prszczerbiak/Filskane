@@ -69,7 +69,7 @@ public class SettingsDAL : BaseDAL
         if (string.IsNullOrWhiteSpace(username)) return null;
 
         const string sql = @"
-            SELECT FIRST_NAME, IS_DARK_MODE, SURFACE_UNIT, FARM_LONGITUDE, FARM_LATITUDE
+            SELECT FIRST_NAME, IS_DARK_MODE, SURFACE_UNIT, FARM_LONGITUDE, FARM_LATITUDE, ACCOUNT_TYPE
             FROM USERS
             WHERE USERNAME = :username";
 
@@ -90,7 +90,8 @@ public class SettingsDAL : BaseDAL
                     Convert.ToInt32(reader["IS_DARK_MODE"]),
                     Convert.ToInt32(reader["SURFACE_UNIT"]),
                     reader["FARM_LONGITUDE"] is DBNull ? null : Convert.ToDouble(reader["FARM_LONGITUDE"]),
-                    reader["FARM_LATITUDE"] is DBNull ? null : Convert.ToDouble(reader["FARM_LATITUDE"])
+                    reader["FARM_LATITUDE"] is DBNull ? null : Convert.ToDouble(reader["FARM_LATITUDE"]),
+                    reader["ACCOUNT_TYPE"]?.ToString() ?? "USER"
                 );
             }
             return null;

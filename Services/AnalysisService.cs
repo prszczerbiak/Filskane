@@ -5,6 +5,8 @@ using Filskane.Models;
 using Filskane.Utils;
 using Filskane.DAL;
 using System.Text.Json;
+using PdfSharp.Drawing;
+using PdfSharp.Pdf;
 
 namespace Filskane.Services;
 
@@ -18,13 +20,19 @@ public class AnalysisService
 
     private readonly ScanDAL _scanDal;
     private readonly FieldDAL _fieldDal;
+    private readonly ReportDAL _reportDal;
     private readonly PythonService _pythonService;
+    private readonly EmailService _emailService;
+    private readonly IConfiguration _configuration;
 
-    public AnalysisService(ScanDAL scanDal, FieldDAL fieldDal, PythonService pythonService)
+    public AnalysisService(ScanDAL scanDal, FieldDAL fieldDal, ReportDAL reportDal, PythonService pythonService, EmailService emailService, IConfiguration configuration)
     {
         _scanDal = scanDal;
         _fieldDal = fieldDal;
+        _reportDal = reportDal;
         _pythonService = pythonService;
+        _emailService = emailService;
+        _configuration = configuration;
     }
 
     /// <summary>
@@ -57,10 +65,175 @@ public class AnalysisService
 
     public async Task<(byte[]? PngBytes, DateTime? Date)> PrepareOverallAnalysisAsync(string username, int fieldId, JsonElement geojson)
     {
+        var analysis = await BuildOverallAnalysisAsync(username, fieldId, geojson);
+        return (analysis.PngBytes, analysis.Date);
+    }
+
+    public async Task<byte[]> GenerateOverallAnalysisReportAsync(string username, int fieldId, JsonElement geojson)
+    {
+        var analysis = await BuildOverallAnalysisAsync(username, fieldId, geojson);
+
+        if (analysis.PngBytes == null || analysis.Date == null || analysis.Field == null)
+            throw new Exception("Brak danych do wygenerowania raportu.");
+
+        var document = new PdfDocument();
+        document.Info.Title = $"Raport analizy pola {analysis.Field.Name}";
+        document.Info.Author = "Filskane";
+
+        var page = document.AddPage();
+        page.Size = PdfSharp.PageSize.A4;
+        page.Orientation = PdfSharp.PageOrientation.Landscape;
+
+        using var graphics = XGraphics.FromPdfPage(page);
+        var titleFont = new XFont("Arial", 20, XFontStyleEx.Bold);
+        var headerFont = new XFont("Arial", 11, XFontStyleEx.Bold);
+        var bodyFont = new XFont("Arial", 10, XFontStyleEx.Regular);
+        var smallFont = new XFont("Arial", 9, XFontStyleEx.Regular);
+        var brush = XBrushes.Black;
+
+        double margin = 28;
+        double top = 28;
+        double leftColumnWidth = 245;
+        double rightColumnX = margin + leftColumnWidth + 18;
+        double rightColumnWidth = page.Width - rightColumnX - margin;
+
+        // --- NOWA LOGIKA: Obliczanie daty siewu i dni wegetacji ---
+        string sowingDateText = analysis.Field.SowingDate.HasValue
+            ? analysis.Field.SowingDate.Value.ToString("dd.MM.yyyy")
+            : "Brak danych";
+
+        string growthDaysText = "Brak danych";
+        if (analysis.Field.SowingDate.HasValue && analysis.Date.HasValue)
+        {
+            // Obliczamy różnicę w dniach między skanem a siewem
+            int days = (int)(analysis.Date.Value.Date - analysis.Field.SowingDate.Value.Date).TotalDays;
+            growthDaysText = days >= 0 ? $"{days} dni" : "Przed siewem";
+        }
+
+        graphics.DrawString("Raport analizy całościowej", titleFont, brush, new XPoint(margin, top + 2));
+        graphics.DrawString($"Pole: {analysis.Field.Name}", headerFont, brush, new XPoint(margin, top + 32));
+        graphics.DrawString($"Data skanu: {analysis.Date:dd.MM.yyyy}", bodyFont, brush, new XPoint(margin, top + 52));
+        graphics.DrawString($"Uprawa: {analysis.Field.PlantName ?? "Brak danych"}", bodyFont, brush, new XPoint(margin, top + 68));
+        graphics.DrawString($"Data siewu: {sowingDateText}", bodyFont, brush, new XPoint(margin, top + 84));
+        graphics.DrawString($"Czas wegetacji (do skanu): {growthDaysText}", bodyFont, brush, new XPoint(margin, top + 100));
+        graphics.DrawString($"Faza rozwoju: {analysis.Field.CycleName ?? "Brak danych"}", bodyFont, brush, new XPoint(margin, top + 116));
+        graphics.DrawString($"Powierzchnia: {FormatArea(analysis.Field.Area)}", bodyFont, brush, new XPoint(margin, top + 132));
+        graphics.DrawString($"Gleba: {analysis.Field.SoilComplex ?? "Brak danych"} / {analysis.Field.SoilType ?? "Brak danych"}", bodyFont, brush, new XPoint(margin, top + 148));
+        graphics.DrawString($"Podłoże: {analysis.Field.SoilSubstrate ?? "Brak danych"}", bodyFont, brush, new XPoint(margin, top + 164));
+        graphics.DrawString("Podsumowanie klas", headerFont, brush, new XPoint(margin, top + 197));
+
+        double summaryY = top + 218;
+        foreach (var line in BuildSummaryLines(analysis.ClassCounts, analysis.Field.Area))
+        {
+            graphics.DrawString(line, smallFont, brush, new XPoint(margin, summaryY));
+            summaryY += 16;
+        }
+
+        graphics.DrawString("Wizualizacja analizy", headerFont, brush, new XPoint(rightColumnX, top + 2));
+        using var imageStream = new MemoryStream(analysis.PngBytes);
+        using var pdfImage = XImage.FromStream(imageStream);
+
+        double maxImageHeight = page.Height - top - 58;
+        double maxImageWidth = rightColumnWidth;
+        double scale = Math.Min(maxImageWidth / pdfImage.PixelWidth, maxImageHeight / pdfImage.PixelHeight);
+        double imageWidth = pdfImage.PixelWidth * scale;
+        double imageHeight = pdfImage.PixelHeight * scale;
+        double imageX = rightColumnX + (maxImageWidth - imageWidth) / 2;
+        double imageY = top + 24;
+
+        graphics.DrawRectangle(XPens.Gray, imageX - 2, imageY - 2, imageWidth + 4, imageHeight + 4);
+        graphics.DrawImage(pdfImage, imageX, imageY, imageWidth, imageHeight);
+
+        var footerText = "Raport wygenerowano automatycznie na podstawie najnowszego skanu i całościowej analizy pola.";
+        graphics.DrawString(footerText, smallFont, brush, new XRect(margin, page.Height - 28, page.Width - margin * 2, 14), XStringFormats.CenterLeft);
+
+        using var output = new MemoryStream();
+        document.Save(output, false);
+        return output.ToArray();
+    }
+
+    public async Task<byte[]> SendOverallAnalysisReportAsync(string username, int fieldId, JsonElement geojson, string recipientEmail)
+    {
+        var reportBytes = await GenerateOverallAnalysisReportAsync(username, fieldId, geojson);
+        var field = await _fieldDal.GetUserFieldByIdAsync(username, fieldId)
+            ?? throw new Exception("Nie znaleziono pola.");
+        var userId = await _reportDal.GetUserIdAsync(username)
+            ?? throw new Exception("Nie znaleziono użytkownika.");
+
+        var subject = $"Raport analizy całościowej pola {field.Name}";
+        var placeholderReportId = await _reportDal.SaveReportAsync(userId, System.Text.Json.JsonSerializer.Serialize(new
+        {
+            fieldId,
+            fieldName = field.Name,
+            recipientEmail,
+            generatedAt = DateTime.UtcNow,
+            subject,
+            body = "Raport został wysłany do walidacji.",
+            pdfBase64 = Convert.ToBase64String(reportBytes)
+        }));
+
+        var validationUrl = $"{_configuration["AppUrl"]}/api/field/overallAnalysisReport/validate/{placeholderReportId}";
+
+        var body = $@"
+            <html>
+                <body style='font-family: Arial, sans-serif;'>
+                    <h3>Raport analizy całościowej</h3>
+                    <p>W załączniku znajduje się raport PDF dla pola <strong>{field.Name}</strong>.</p>
+                    <p>
+                        <a href='{validationUrl}' style='display:inline-block;padding:12px 18px;background:#2e7d32;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;'>
+                            Zatwierdź raport
+                        </a>
+                    </p>
+                    <p>Wysłano automatycznie z systemu Filskane.</p>
+                </body>
+            </html>";
+
+        var reportRecord = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            reportId = placeholderReportId,
+            fieldId,
+            fieldName = field.Name,
+            recipientEmail,
+            generatedAt = DateTime.UtcNow,
+            subject,
+            body,
+            validationUrl,
+            pdfBase64 = Convert.ToBase64String(reportBytes)
+        });
+
+        await _reportDal.UpdateReportContentAsync(placeholderReportId, reportRecord);
+
+        await _emailService.SendEmailWithAttachmentAsync(
+            recipientEmail,
+            subject,
+            body,
+            reportBytes,
+            $"raport-analizy-pola-{fieldId}-{DateTime.Now:yyyyMMdd-HHmm}.pdf");
+
+        return reportBytes;
+    }
+
+    public async Task<bool> ValidateOverallAnalysisReportAsync(int reportId)
+        => await _reportDal.MarkReportAsValidatedAsync(reportId);
+
+    public async Task<bool> RejectOverallAnalysisReportAsync(int reportId)
+        => await _reportDal.RejectReportAsync(reportId);
+
+    public async Task<List<UserReportDto>> GetUserReportsAsync(string username)
+        => await _reportDal.GetUserReportsAsync(username);
+
+    public async Task<List<UserReportDto>> GetPendingReportsAsync()
+        => await _reportDal.GetPendingReportsAsync();
+
+    public async Task<byte[]?> GetReportPdfAsync(int reportId)
+        => await _reportDal.GetReportPdfAsync(reportId);
+
+    private async Task<OverallAnalysisData> BuildOverallAnalysisAsync(string username, int fieldId, JsonElement geojson)
+    {
         ScanResultDto? scan = await _scanDal.GetLatestScanAsync(username, fieldId);
 
         if (scan == null || scan.ImageBytes == null || scan.ImageBytes.Length == 0)
-            return (null, null);
+            return new OverallAnalysisData(null, null, [], null, []);
 
         var field = await _fieldDal.GetUserFieldByIdAsync(username, fieldId)
             ?? throw new Exception("Nie znaleziono pola.");
@@ -117,8 +290,78 @@ public class AnalysisService
             rgbImage = ImageUtils.DrawGeoJsonPolygonOnImage(rgbImage, geojson, scan.FieldBbox, false);
         }
 
-        return (rgbImage, scan.ScanDate);
+        return new OverallAnalysisData(rgbImage, scan.ScanDate, classMatrix, field, CountClasses(classMatrix));
     }
+
+    private static Dictionary<int, int> CountClasses(int[][] classMatrix)
+    {
+        var counts = new Dictionary<int, int>();
+
+        foreach (var row in classMatrix)
+        {
+            foreach (var value in row)
+            {
+                counts[value] = counts.TryGetValue(value, out var current) ? current + 1 : 1;
+            }
+        }
+
+        return counts;
+    }
+
+    private static IEnumerable<string> BuildSummaryLines(Dictionary<int, int> counts, double areaM2)
+    {
+        var labels = new Dictionary<int, string>
+        {
+            [0] = "Dobry stan",
+            [1] = "Zadowalający",
+            [2] = "Zagrożenie NDVI",
+            [3] = "Zagrożenie GNDVI",
+            [4] = "Zagrożenie NDWI",
+            [5] = "Zagrożenie NDWI + GNDVI"
+        };
+
+        // 1. Zliczamy wszystkie przeanalizowane piksele na polu
+        int totalPixels = labels.Keys.Sum(k => counts.TryGetValue(k, out var c) ? c : 0);
+
+        foreach (var label in labels)
+        {
+            counts.TryGetValue(label.Key, out var count);
+
+            // Zabezpieczenie przed dzieleniem przez 0 w przypadku pustego skanu
+            if (totalPixels == 0)
+            {
+                yield return $"{label.Value}: 0.00 ha (0.00%)";
+                continue;
+            }
+
+            // 2. Przeliczamy na hektary (1 piksel = 100m2 = 0.01 ha)
+            
+
+            // 3. Obliczamy procentowy udział tej klasy w całym polu
+            double fraction = ((double)count / totalPixels);
+
+            double areaInHectares = fraction * areaM2 / 10000;
+
+            double percentage = fraction * 100;
+
+
+            // 4. Formaturjemy ciąg znaków do raportu (2 miejsca po przecinku)
+            yield return $"{label.Value}: {areaInHectares:0.00} ha ({percentage:0.00}%)";
+        }
+    }
+
+    private static string FormatArea(double areaM2)
+    {
+        if (areaM2 <= 0) return "0.0000 ha";
+        return $"{areaM2 / 10000:0.0000} ha";
+    }
+
+    private sealed record OverallAnalysisData(
+        byte[]? PngBytes,
+        DateTime? Date,
+        int[][] ClassMatrix,
+        FieldDetailDto? Field,
+        Dictionary<int, int> ClassCounts);
 
     /// <summary>
     /// Pobiera surowe dane numeryczne NDVI dla skanu.

@@ -59,5 +59,35 @@ namespace Filskane.Services
                 throw;
             }
         }
+
+        public async Task SendEmailWithAttachmentAsync(string toEmail, string subject, string body, byte[] attachmentBytes, string attachmentFileName)
+        {
+            using var message = new MailMessage();
+            message.From = new MailAddress(_config["Smtp:User"]);
+            message.To.Add(toEmail);
+            message.Subject = subject;
+            message.Body = body;
+            message.IsBodyHtml = true;
+
+            using var attachmentStream = new MemoryStream(attachmentBytes);
+            using var attachment = new Attachment(attachmentStream, attachmentFileName, "application/pdf");
+            message.Attachments.Add(attachment);
+
+            using var client = new SmtpClient(_config["Smtp:Host"], int.Parse(_config["Smtp:Port"]));
+            client.UseDefaultCredentials = false;
+            client.Credentials = new NetworkCredential(_config["Smtp:User"], _config["Smtp:Pass"]);
+            client.EnableSsl = true;
+
+            try
+            {
+                await client.SendMailAsync(message);
+                _logger.LogInformation("Wysłano e-mail z załącznikiem do: {Email}", toEmail);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Błąd wysyłki e-maila z załącznikiem do {Email}", toEmail);
+                throw;
+            }
+        }
     }
 }

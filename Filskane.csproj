@@ -14,6 +14,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Remove="Services\Fonts\ARIAL.TTF" />
+    <None Remove="Services\Fonts\ARIALBD.TTF" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Services\Fonts\ARIAL.TTF" />
+    <EmbeddedResource Include="Services\Fonts\ARIALBD.TTF" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="wwwroot\css\colorbar.png" />
     <None Include="wwwroot\css\colorbarDark.png" />
   </ItemGroup>
@@ -26,6 +36,7 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />
     <PackageReference Include="Microsoft.OpenApi" Version="1.6.22" />
     <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.26.100" />
+    <PackageReference Include="PDFsharp" Version="6.2.4" />
     <PackageReference Include="pythonnet" Version="3.0.5" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.12.40" />
     <PackageReference Include="ScottPlot" Version="5.1.57" />

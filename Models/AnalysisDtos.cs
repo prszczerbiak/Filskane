@@ -110,6 +110,18 @@ namespace Filskane.Models
     );
 
     /// <summary>
+    /// Obiekt reprezentujący raport użytkownika w widoku listy.
+    /// </summary>
+    public record UserReportDto(
+        int ReportId,
+        string Username,
+        int FieldId,
+        string FieldName,
+        DateTime? GeneratedAt,
+        string Validation
+    );
+
+    /// <summary>
     /// Wynik działania algorytmu DBSCAN z API Pythonowego.
     /// </summary>
     public record DbscanResultDto(
